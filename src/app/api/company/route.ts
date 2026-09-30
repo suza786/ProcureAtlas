@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
 
-// GET /api/company — Company Brain payload for the demo tenant
+// GET /api/company — Company Brain payload for the current tenant
 export async function GET() {
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  const ctx = await getCurrentTenant()
+  if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const company = await db.company.findFirst({
-    where: { tenantId: tenant.id },
+    where: { tenantId: ctx.tenantId },
     include: {
       evidence: { orderBy: { expiresAt: 'asc' } },
       certifications: { orderBy: { expiresAt: 'asc' } },

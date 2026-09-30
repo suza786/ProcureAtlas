@@ -19,6 +19,11 @@ import {
   Building2,
   Globe,
   ExternalLink,
+  Plus,
+  Upload,
+  X,
+  Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 
 interface CompanyData {
@@ -106,6 +111,7 @@ const EVIDENCE_CATEGORY_LABEL: Record<string, string> = {
 export function CompanyBrain() {
   const [data, setData] = useState<CompanyData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showUpload, setShowUpload] = useState(false)
 
   useEffect(() => {
     fetch('/api/company')
@@ -283,12 +289,20 @@ export function CompanyBrain() {
 
       {/* Evidence list */}
       <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <FileCheck2 className="h-4 w-4 text-emerald-600" />
-            Evidence Library
-          </h2>
-          <p className="text-xs text-slate-500 mt-0.5">Every factual company claim is linked to verifiable evidence.</p>
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+              <FileCheck2 className="h-4 w-4 text-emerald-600" />
+              Evidence Library
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">Every factual company claim is linked to verifiable evidence.</p>
+          </div>
+          <button
+            onClick={() => setShowUpload(true)}
+            className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Evidence
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -365,6 +379,182 @@ export function CompanyBrain() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Upload modal */}
+      {showUpload && (
+        <UploadModal
+          onClose={() => setShowUpload(false)}
+          onUploaded={() => {
+            setShowUpload(false)
+            // Reload data
+            fetch('/api/company').then(r => r.json()).then(d => setData(d))
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
+  const [file, setFile] = useState<File | null>(null)
+  const [category, setCategory] = useState('certification')
+  const [title, setTitle] = useState('')
+  const [issuer, setIssuer] = useState('')
+  const [expiresAt, setExpiresAt] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
+
+  const submit = async () => {
+    if (!file || !title) {
+      setError('File and title are required.')
+      return
+    }
+    setUploading(true)
+    setError(null)
+    try {
+      // Step 1: upload file
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('category', 'evidence')
+      const uploadRes = await fetch('/api/uploads', { method: 'POST', body: formData })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) {
+        setError(uploadData.error ?? 'Upload failed')
+        return
+      }
+      // Step 2: create evidence linked to file
+      const evRes = await fetch('/api/company/evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category,
+          title,
+          issuer: issuer || undefined,
+          expiresAt: expiresAt || undefined,
+          fileUploadId: uploadData.id,
+        }),
+      })
+      if (!evRes.ok) {
+        const evData = await evRes.json()
+        setError(evData.error ?? 'Evidence creation failed')
+        return
+      }
+      setSuccess('Evidence uploaded and linked successfully.')
+      setTimeout(() => onUploaded(), 1200)
+    } catch (e) {
+      setError('Network error: ' + (e as Error).message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-lg bg-white p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold text-slate-900">Add Evidence</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-900">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Title *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. ISO 27001:2022 Certification"
+              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 bg-white"
+            >
+              {Object.entries(EVIDENCE_CATEGORY_LABEL).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Issuer</label>
+            <input
+              type="text"
+              value={issuer}
+              onChange={(e) => setIssuer(e.target.value)}
+              placeholder="e.g. BSI, Microsoft, RJSC"
+              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">Expires (optional)</label>
+            <input
+              type="date"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">File * (PDF, PNG, JPG, TXT, DOCX, XLSX — max 25 MB)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                accept=".pdf,.png,.jpg,.jpeg,.txt,.docx,.xlsx"
+                className="text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-900 file:text-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:cursor-pointer"
+              />
+            </div>
+            {file && (
+              <p className="text-[10px] text-slate-500 mt-1">
+                {file.name} — {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
+          </div>
+
+          {error && (
+            <div className="text-xs text-rose-700 bg-rose-500/5 border border-rose-500/30 rounded-md p-2">
+              {error}
+            </div>
+          )}
+          {success && (
+            <div className="text-xs text-emerald-700 bg-emerald-500/5 border border-emerald-500/30 rounded-md p-2 flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5" /> {success}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={submit}
+              disabled={uploading || !file || !title}
+              className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+              {uploading ? 'Uploading...' : 'Upload'}
+            </button>
+            <button
+              onClick={onClose}
+              className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5"
+            >Cancel</button>
+          </div>
         </div>
       </div>
     </div>

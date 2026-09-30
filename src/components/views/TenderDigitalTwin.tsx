@@ -29,6 +29,9 @@ import {
   ArrowLeft,
   Target,
   Download,
+  Sparkles,
+  Loader2,
+  Brain,
 } from 'lucide-react'
 
 interface TenderDetail {
@@ -118,7 +121,9 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
   const [tender, setTender] = useState<TenderDetail | null>(null)
   const [scoring, setScoring] = useState<ScoringResult | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'amendments' | 'awards' | 'scoring'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'requirements' | 'amendments' | 'awards' | 'scoring' | 'extraction'>('overview')
+  const [extracting, setExtracting] = useState(false)
+  const [extractionResult, setExtractionResult] = useState<{ success: boolean; itemCount: number; extractionId: string; error?: string; note?: string } | null>(null)
   const openTender = useAppStore((s) => s.openTender)
   const goDiscover = useAppStore((s) => s.goDiscover)
   const goPursuits = useAppStore((s) => s.goPursuits)
@@ -277,6 +282,42 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
                 <Target className="h-3.5 w-3.5" /> Create Pursuit
               </button>
             )}
+            <button
+              onClick={async () => {
+                setExtracting(true)
+                setExtractionResult(null)
+                try {
+                  const res = await fetch(`/api/tenders/${tender.id}/extract-requirements`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                  })
+                  const data = await res.json()
+                  setExtractionResult({
+                    success: data.success,
+                    itemCount: data.items?.length ?? 0,
+                    extractionId: data.extractionId,
+                    error: data.error,
+                    note: data.note,
+                  })
+                  setActiveTab('extraction')
+                } catch (e) {
+                  setExtractionResult({
+                    success: false,
+                    itemCount: 0,
+                    extractionId: '',
+                    error: (e as Error).message,
+                  })
+                } finally {
+                  setExtracting(false)
+                }
+              }}
+              disabled={extracting}
+              className="rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-700 hover:bg-violet-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              title="Trigger LLM extraction. Output is pending human review — nothing is written to the Requirement table until approved."
+            >
+              {extracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {extracting ? 'Extracting...' : 'Extract Requirements (LLM)'}
+            </button>
           </div>
         </div>
       )}
@@ -286,6 +327,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
         {[
           { id: 'overview', label: 'Overview', icon: FileText },
           { id: 'requirements', label: `Requirements (${tender.requirements.length})`, icon: CheckCircle2 },
+          { id: 'extraction', label: 'LLM Extraction', icon: Sparkles },
           { id: 'amendments', label: `Amendments (${tender.amendments.length})`, icon: AlertCircle },
           { id: 'awards', label: `Awards (${tender.awards.length})`, icon: Gavel },
           { id: 'scoring', label: 'Scoring Detail', icon: Target },
@@ -313,6 +355,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         {activeTab === 'overview' && <OverviewTab tender={tender} />}
         {activeTab === 'requirements' && <RequirementsTab tender={tender} />}
+        {activeTab === 'extraction' && <ExtractionTab tenderId={tender.id} result={extractionResult} extracting={extracting} onNavigateToQueue={() => useAppStore.getState().goExtractions()} />}
         {activeTab === 'amendments' && <AmendmentsTab tender={tender} />}
         {activeTab === 'awards' && <AwardsTab tender={tender} />}
         {activeTab === 'scoring' && scoring && <ScoringTab scoring={scoring} />}
@@ -666,6 +709,94 @@ function TimelineRow({ icon: Icon, label, value, highlight }: {
       <Icon className={cn('h-3.5 w-3.5', highlight ? 'text-rose-600' : 'text-slate-400')} />
       <span className="text-slate-500">{label}:</span>
       <span className={cn('font-medium', highlight ? 'text-rose-700' : 'text-slate-900')}>{value}</span>
+    </div>
+  )
+}
+
+function ExtractionTab({
+  tenderId,
+  result,
+  extracting,
+  onNavigateToQueue,
+}: {
+  tenderId: string
+  result: { success: boolean; itemCount: number; extractionId: string; error?: string; note?: string } | null
+  extracting: boolean
+  onNavigateToQueue: () => void
+}) {
+  const goExtractions = useAppStore((s) => s.goExtractions)
+  return (
+    <div className="space-y-4">
+      <div className="rounded-md border border-violet-500/30 bg-violet-500/5 p-3">
+        <div className="flex items-start gap-2">
+          <Brain className="h-4 w-4 text-violet-700 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <p className="font-semibold text-violet-900">LLM Requirement Extraction</p>
+            <p className="text-violet-700 mt-1 leading-relaxed">
+              Trigger an LLM call to extract structured requirements from the tender description.
+              The LLM is sandboxed: untrusted tender text is wrapped in &lt;UNTRUSTED_DATA&gt; blocks,
+              output is validated against a strict Zod schema, every extracted item must include a
+              verbatim sourceSnippet, and the result is queued for <strong>human review</strong> —
+              nothing reaches the Requirement table until approved.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {extracting && (
+        <div className="flex items-center gap-2 text-sm text-slate-600">
+          <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+          Calling LLM (glm-4.6)... this may take a few seconds.
+        </div>
+      )}
+
+      {result && !extracting && (
+        <div className={cn(
+          'rounded-md border p-3 text-xs',
+          result.success ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/30 bg-rose-500/5'
+        )}>
+          <div className="flex items-start gap-2">
+            {result.success ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />}
+            <div className="flex-1">
+              <p className={cn('font-semibold', result.success ? 'text-emerald-800' : 'text-rose-800')}>
+                {result.success ? `Extraction complete — ${result.itemCount} items extracted` : 'Extraction failed'}
+              </p>
+              {result.error && <p className="text-rose-700 mt-1">{result.error}</p>}
+              {result.note && <p className="text-slate-700 mt-1">{result.note}</p>}
+              {result.success && result.extractionId && (
+                <button
+                  onClick={goExtractions}
+                  className="mt-2 text-violet-700 hover:text-violet-900 font-medium flex items-center gap-1"
+                >
+                  Review in queue →
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {!result && !extracting && (
+        <div className="text-center py-8">
+          <Sparkles className="h-8 w-8 text-violet-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500 mb-1">No extraction run yet for this tender.</p>
+          <p className="text-xs text-slate-400">Click "Extract Requirements (LLM)" above to trigger an extraction.</p>
+        </div>
+      )}
+
+      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+        <p className="font-semibold text-slate-700 mb-1">Guardrails in force</p>
+        <ul className="space-y-0.5 list-disc list-inside">
+          <li>Backend-only LLM invocation (never client-side)</li>
+          <li>Input sanitization — control chars stripped, length capped at 32k chars</li>
+          <li>Prompt-injection resistance — tender text wrapped as data, not instructions</li>
+          <li>Strict Zod schema validation on output</li>
+          <li>Every extracted item must include a sourceSnippet (verbatim quote)</li>
+          <li>Confidence threshold: items below 0.7 are flagged for manual review</li>
+          <li>Full audit log: model, tokens, latency, cost, prompt hash</li>
+          <li>Nothing persisted to Requirement table without human approval</li>
+        </ul>
+      </div>
     </div>
   )
 }

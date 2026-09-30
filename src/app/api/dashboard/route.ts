@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/dashboard — Command Center aggregate (KPIs + recent activity)
 export async function GET() {
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  const ctx = await getCurrentTenant()
+  if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const company = await db.company.findFirst({ where: { tenantId: tenant.id } })
+  const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } })
+  const company = await db.company.findFirst({ where: { tenantId: ctx.tenantId } })
 
   const [tenders, pursuits, alerts, awards] = await Promise.all([
     db.tender.findMany({
@@ -16,7 +18,7 @@ export async function GET() {
       take: 20,
     }),
     db.pursuit.findMany({
-      where: { tenantId: tenant.id },
+      where: { tenantId: ctx.tenantId },
       include: {
         tender: { select: { title: true, submissionDeadline: true, valueUSD: true, market: true } },
         bid: { select: { status: true } },
@@ -24,7 +26,7 @@ export async function GET() {
       orderBy: { updatedAt: 'desc' },
     }),
     db.alert.findMany({
-      where: { tenantId: tenant.id, acknowledgedAt: null },
+      where: { tenantId: ctx.tenantId, acknowledgedAt: null },
       orderBy: { severity: 'desc' },
       take: 8,
     }),
@@ -74,7 +76,7 @@ export async function GET() {
   }
 
   return NextResponse.json({
-    tenant: { name: tenant.name, plan: tenant.plan, region: tenant.region },
+    tenant: { name: tenant?.name ?? ctx.tenantSlug, plan: tenant?.plan ?? 'professional', region: tenant?.region ?? 'BD' },
     company: company ? { id: company.id, name: company.name, country: company.country, annualTurnoverUSD: company.annualTurnoverUSD } : null,
     kpis: {
       activeTenderCount,

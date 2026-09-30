@@ -1,9 +1,11 @@
-// ProcureAtlas AI — Deterministic seed script
+// ProcureAtlas AI — Deterministic seed script (Phase 2)
 // Run: bun run scripts/seed.ts
 // Idempotent: wipes tenant-scoped tables, then inserts fresh demo data.
 // All data is FICTIONAL but realistic — designed to exercise every module.
 
 import { PrismaClient } from '@prisma/client'
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 const prisma = new PrismaClient()
 
@@ -16,6 +18,12 @@ async function main() {
   console.log('🌱 Seeding ProcureAtlas AI demo data...')
 
   // Clean (order matters for FK constraints)
+  await prisma.notification.deleteMany()
+  await prisma.apiKey.deleteMany()
+  await prisma.connectorRun.deleteMany()
+  await prisma.llmExtraction.deleteMany()
+  await prisma.fileUpload.deleteMany()
+  await prisma.session.deleteMany()
   await prisma.auditLog.deleteMany()
   await prisma.alert.deleteMany()
   await prisma.outcome.deleteMany()
@@ -56,7 +64,7 @@ async function main() {
     await prisma.dataSource.create({ data: s })
   }
 
-  // ---------- Tenant & User ----------
+  // ---------- Tenant & Users (Phase 2: password-hashed credentials) ----------
   const tenant = await prisma.tenant.create({
     data: {
       name: 'Atlas Demo Co.',
@@ -66,15 +74,86 @@ async function main() {
     },
   })
 
-  await prisma.user.create({
+  const passwordHash = await bcrypt.hash('demo1234', 12)
+  const ownerUser = await prisma.user.create({
     data: {
       tenantId: tenant.id,
       email: 'owner@atlas-demo.com',
       name: 'Demo Owner',
       role: 'owner',
-      mfaEnabled: true,
+      passwordHash,
+      mfaEnabled: false,
       lastLoginAt: daysAgo(0),
     },
+  })
+
+  const managerUser = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      email: 'manager@atlas-demo.com',
+      name: 'Sadia Karim',
+      role: 'manager',
+      passwordHash: await bcrypt.hash('demo1234', 12),
+      mfaEnabled: false,
+    },
+  })
+
+  const contributorUser = await prisma.user.create({
+    data: {
+      tenantId: tenant.id,
+      email: 'contributor@atlas-demo.com',
+      name: 'Tanvir Hasan',
+      role: 'contributor',
+      passwordHash: await bcrypt.hash('demo1234', 12),
+    },
+  })
+
+  // Phase 2: Demo API keys for MCP / public API
+  const apiKey1 = crypto.randomBytes(24).toString('hex')
+  const apiKey2 = crypto.randomBytes(24).toString('hex')
+  await prisma.apiKey.createMany({
+    data: [
+      {
+        tenantId: tenant.id,
+        userId: ownerUser.id,
+        name: 'MCP Read Key',
+        keyPrefix: apiKey1.slice(0, 8),
+        keyHash: bcrypt.hashSync(apiKey1, 10),
+        scopes: 'mcp:read api:read',
+        expiresAt: daysFromNow(365),
+      },
+      {
+        tenantId: tenant.id,
+        userId: managerUser.id,
+        name: 'API Read/Write Key',
+        keyPrefix: apiKey2.slice(0, 8),
+        keyHash: bcrypt.hashSync(apiKey2, 10),
+        scopes: 'api:read api:write',
+        expiresAt: daysFromNow(180),
+      },
+    ],
+  })
+
+  // Phase 2: Sample audit log entries (auth + LLM calls)
+  await prisma.auditLog.createMany({
+    data: [
+      { tenantId: tenant.id, userId: ownerUser.id, action: 'login_success', entityType: 'auth', entityId: ownerUser.id, ipHash: 'demo_hash_1', userAgent: 'Mozilla/5.0', createdAt: daysAgo(0) },
+      { tenantId: tenant.id, userId: ownerUser.id, action: 'login_success', entityType: 'auth', entityId: ownerUser.id, ipHash: 'demo_hash_1', userAgent: 'Mozilla/5.0', createdAt: daysAgo(1) },
+      { tenantId: tenant.id, userId: managerUser.id, action: 'login_success', entityType: 'auth', entityId: managerUser.id, createdAt: daysAgo(2) },
+      { tenantId: tenant.id, userId: ownerUser.id, action: 'pursuit_created', entityType: 'pursuit', entityId: 'demo', afterJson: JSON.stringify({ stage: 'qualifying' }), createdAt: daysAgo(2) },
+      { tenantId: tenant.id, userId: ownerUser.id, action: 'llm_extraction_completed', entityType: 'tender', entityId: 'demo', llmModel: 'glm-4.6', llmInputTokens: 1240, llmOutputTokens: 580, llmLatencyMs: 2300, llmCostUsd: 0.0085, createdAt: daysAgo(3) },
+      { tenantId: tenant.id, userId: ownerUser.id, action: 'evidence_uploaded', entityType: 'evidence', entityId: 'demo', afterJson: JSON.stringify({ category: 'certification', fileName: 'ISO27001.pdf' }), createdAt: daysAgo(4) },
+    ],
+  })
+
+  // Phase 2: Sample notifications
+  await prisma.notification.createMany({
+    data: [
+      { tenantId: tenant.id, userId: ownerUser.id, type: 'extraction_ready', title: 'Requirements extracted for SOC Platform tender', message: '8 requirements extracted — review pending.', link: '/tenders/demo', createdAt: daysAgo(1) },
+      { tenantId: tenant.id, userId: ownerUser.id, type: 'deadline', title: 'Submission deadline in 21 days', message: 'BCC SOC Platform tender closing soon.', createdAt: daysAgo(0) },
+      { tenantId: tenant.id, userId: managerUser.id, type: 'approval_request', title: 'Bid submission approval requested', message: 'Nationwide Police Network pursuit needs approval.', createdAt: daysAgo(2) },
+      { tenantId: tenant.id, type: 'system', title: 'Phase 2 update available', message: 'LLM extraction, file uploads, and MCP server are now available.', createdAt: daysAgo(0) },
+    ],
   })
 
   // ---------- Organizations (buyers + suppliers) ----------
@@ -644,11 +723,78 @@ async function main() {
     ],
   })
 
+  // ---------- Phase 2: FileUploads + LlmExtractions + ConnectorRuns ----------
+  // Sample FileUpload linked to one evidence
+  const isoEvidence = evidence[4] // ISO 27001 evidence
+  if (isoEvidence) {
+    await prisma.fileUpload.create({
+      data: {
+        tenantId: tenant.id,
+        uploadedById: ownerUser.id,
+        fileName: 'ISO27001_Certificate.pdf',
+        fileType: 'application/pdf',
+        fileSizeKb: 248,
+        checksum: crypto.createHash('sha256').update('iso27001-demo').digest('hex'),
+        storageKey: `${tenant.id}/evidence/${isoEvidence.id}/ISO27001_Certificate.pdf`,
+        storageUrl: null,
+        category: 'evidence',
+        evidenceId: isoEvidence.id,
+        virusScanResult: 'clean',
+        textExtracted: 'BSI Group hereby certifies that Atlas Demo Co. operates an Information Security Management System complying with ISO/IEC 27001:2022. Certificate number IS-7283901. Issue date 2024-12-03. Expiry date 2026-12-02.',
+        textExtractedAt: daysAgo(60),
+      },
+    })
+  }
+
+  // Sample LLM extraction record for the first tender (pending review)
+  const firstTender = activeTenders[0]
+  if (firstTender) {
+    await prisma.llmExtraction.create({
+      data: {
+        tenantId: tenant.id,
+        tenderId: firstTender.id,
+        requestedById: ownerUser.id,
+        taskType: 'requirement_extraction',
+        status: 'completed',
+        reviewStatus: 'pending',
+        model: 'glm-4.6',
+        inputTokens: 1240,
+        outputTokens: 580,
+        latencyMs: 2300,
+        costUsd: 0.0085,
+        promptHash: crypto.createHash('sha256').update('req-extraction-v1').digest('hex').slice(0, 16),
+        outputJson: JSON.stringify({
+          items: [
+            { category: 'experience', criterion: 'Minimum annual turnover', threshold: '50000000 BDT', confidence: 0.95 },
+            { category: 'certification', criterion: 'ISO 27001', threshold: 'Valid', confidence: 0.98 },
+            { category: 'experience', criterion: 'Years in business', threshold: '>= 5 years', confidence: 0.92 },
+          ],
+        }),
+        extractedItemsJson: JSON.stringify([
+          { category: 'experience', criterion: 'Minimum annual turnover', threshold: '50000000 BDT', confidence: 0.95 },
+          { category: 'certification', criterion: 'ISO 27001', threshold: 'Valid', confidence: 0.98 },
+          { category: 'experience', criterion: 'Years in business', threshold: '>= 5 years', confidence: 0.92 },
+        ]),
+      },
+    })
+  }
+
+  // Sample connector runs
+  await prisma.connectorRun.createMany({
+    data: [
+      { sourceCode: 'cptu_bd', runType: 'scheduled', status: 'success', startedAt: daysAgo(1), completedAt: daysAgo(1), itemsFetched: 47, itemsCreated: 3, itemsUpdated: 12, itemsSkipped: 32 },
+      { sourceCode: 'gebiz_sg', runType: 'scheduled', status: 'success', startedAt: daysAgo(1), completedAt: daysAgo(1), itemsFetched: 23, itemsCreated: 2, itemsUpdated: 5, itemsSkipped: 16 },
+      { sourceCode: 'worldbank', runType: 'scheduled', status: 'partial', startedAt: daysAgo(1), completedAt: daysAgo(1), itemsFetched: 89, itemsCreated: 1, itemsUpdated: 8, itemsSkipped: 80, errorMessage: '5 items skipped due to malformed XML' },
+      { sourceCode: 'ungm', runType: 'manual', status: 'success', startedAt: daysAgo(2), completedAt: daysAgo(2), itemsFetched: 14, itemsCreated: 1, itemsUpdated: 3, itemsSkipped: 10 },
+    ],
+  })
+
   console.log('✅ Seed complete.')
   console.log(`   Tenant: ${tenant.id}`)
   console.log(`   Company: ${company.id}`)
   console.log(`   Tenders: ${createdTenders.length}`)
   console.log(`   Pursuits: ${activeTenders.length}`)
+  console.log(`   Users: 3 (owner/manager/contributor) — password: demo1234`)
 }
 
 main()

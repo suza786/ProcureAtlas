@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
+import { logAction } from '@/lib/auth'
 
-// GET /api/pursuits — list pursuits for tenant (Phase 1: hardcoded tenant slug)
+// GET /api/pursuits — list pursuits for tenant
 export async function GET() {
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ items: [], total: 0 })
+  const ctx = await getCurrentTenant()
 
   const pursuits = await db.pursuit.findMany({
-    where: { tenantId: tenant.id },
+    where: { tenantId: ctx.tenantId },
     include: {
       tender: { include: { buyer: { include: { organization: true } } } },
       company: true,
@@ -58,8 +59,9 @@ export async function GET() {
   })
 }
 
-// POST /api/pursuits — create a pursuit (bid/no-bid decision)
+// POST /api/pursuits — create a pursuit (bid/no-bid decision recorded)
 export async function POST(req: NextRequest) {
+  const ctx = await getCurrentTenant()
   const body = await req.json()
   const { tenderId, companyId, stage, bidDecision, decisionReason, priority } = body
 
@@ -67,12 +69,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'tenderId and companyId required' }, { status: 400 })
   }
 
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+  // Verify company belongs to tenant
+  const company = await db.company.findFirst({
+    where: { id: companyId, tenantId: ctx.tenantId },
+  })
+  if (!company) {
+    return NextResponse.json({ error: 'Company not found in tenant scope' }, { status: 404 })
+  }
 
   const pursuit = await db.pursuit.create({
     data: {
-      tenantId: tenant.id,
+      tenantId: ctx.tenantId,
       tenderId,
       companyId,
       stage: stage ?? 'discovering',
@@ -81,6 +88,16 @@ export async function POST(req: NextRequest) {
       priority: priority ?? 'medium',
       decidedAt: bidDecision && bidDecision !== 'pending' ? new Date() : null,
     },
+  })
+
+  await logAction({
+    tenantId: ctx.tenantId,
+    userId: ctx.userId,
+    action: 'pursuit_created',
+    entityType: 'pursuit',
+    entityId: pursuit.id,
+    afterJson: { stage, bidDecision, tenderId, companyId },
+    request: req,
   })
 
   return NextResponse.json(pursuit, { status: 201 })

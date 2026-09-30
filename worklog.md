@@ -27,6 +27,43 @@ Stage Summary:
 - Lint passes with zero errors; dev server healthy on port 3000; no console errors during navigation
 
 ---
+Task ID: 2
+Agent: main
+Task: Phase 2 — Authentication, LLM Extraction, File Uploads, Connectors, MCP Server
+
+Work Log:
+- Extended Prisma schema with 7 new models: Session, FileUpload, LlmExtraction, ConnectorRun, ApiKey, Notification (+ User extended with auth fields)
+- Built auth library (src/lib/auth.ts): bcrypt password hashing, session-cookie auth, account lockout, RBAC, audit logging
+- Built tenant service layer (src/lib/tenant.ts): getCurrentTenant() enforces tenant scope on all queries
+- Refactored all Phase 1 API routes to use getCurrentTenant() instead of hardcoded tenant slug
+- Built LLM abstraction layer (src/lib/llm/index.ts) with full guardrails: input sanitization, prompt-injection resistance, Zod schema validation, source citation requirements, confidence thresholds, audit logging, graceful degradation
+- Created 3 LLM task types: extractRequirements, summarizeTender, generateEligibilityNarrative
+- Built extraction endpoint + review queue: POST /api/tenders/[id]/extract-requirements, GET/PATCH /api/extractions
+- Verified live LLM call: GLM-4.6 model, 4 requirements extracted with source snippets, $0.0009 cost
+- Built file upload pipeline: POST /api/uploads with file-type whitelist, size limit, SHA-256 checksum, text extraction
+- Built evidence creation endpoint: POST /api/company/evidence linked to FileUpload
+- Built Bangladesh CPTU connector skeleton (src/lib/connectors/cptu_bd.ts) with mock fetcher, ConnectorRun audit logging
+- Built MCP server mini-service (port 3001) with 7 read-only tools, JSON-RPC 2.0, API key auth, full audit logging
+- Built API key management: bcrypt-hashed keys with pak_ prefix, scopes, expiry, revocation
+- Built audit log API + UI with LLM-specific fields, CSV export, detail drawer
+- Built notifications API with mark-as-read
+- Built 5 new UI views: SignIn, AuditLog, Extractions (review queue), Connectors, Settings
+- Enhanced Company Brain with "Add Evidence" upload modal
+- Enhanced Tender Digital Twin with "Extract Requirements (LLM)" button + LLM Extraction tab
+- Enhanced Sidebar with Phase 2 navigation items + session-aware user card
+- Updated seed script with 3 users (bcrypt passwords), 2 API keys, 6 audit entries, 4 notifications, 1 FileUpload, 1 LlmExtraction, 4 ConnectorRuns
+- Wrote MCP_SERVER.md documentation
+- Updated PROJECT_STATE.md with full Phase 2 handoff
+
+Stage Summary:
+- Phase 2 complete and verified: auth, LLM extraction (live GLM-4.6 call), file uploads, connectors, MCP server, audit logging
+- 17 new API routes added (total 26 across Phase 1 + 2)
+- MCP server running on port 3001 with 7 read-only tools
+- All 4 product principles enforced in code: evidence-gated LLM, source-cited extraction, deterministic scoring, human-in-the-loop review
+- Lint passes; agent-browser verified all new views render correctly
+- 6 screenshots saved documenting Phase 2 features
+
+---
 Task ID: 1-docs
 Agent: general-purpose (docs sub-agent)
 Task: Write ProcureAtlas documentation suite (20 files under /docs)

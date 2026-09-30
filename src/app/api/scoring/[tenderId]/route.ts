@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
 import {
   computeEligibilityScore,
   computeOpportunityFitScore,
   computeSubmissionReadinessScore,
 } from '@/lib/scoring'
 
-// GET /api/scoring/[tenderId] — deterministic scores for a tender + demo company
+// GET /api/scoring/[tenderId] — deterministic scores for a tender + tenant's company
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ tenderId: string }> }
 ) {
   const { tenderId } = await params
+  const ctx = await getCurrentTenant()
+  if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
-
-  const company = await db.company.findFirst({ where: { tenantId: tenant.id } })
+  const company = await db.company.findFirst({ where: { tenantId: ctx.tenantId } })
   if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
 
   const tender = await db.tender.findUnique({

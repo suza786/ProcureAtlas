@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
 
-// GET /api/alerts — active alerts for the demo tenant
+// GET /api/alerts — active alerts for the current tenant
 export async function GET() {
-  const tenant = await db.tenant.findUnique({ where: { slug: 'atlas-demo' } })
-  if (!tenant) return NextResponse.json({ items: [] })
+  const ctx = await getCurrentTenant()
+  if (!ctx.tenantId) return NextResponse.json({ items: [] })
 
   const alerts = await db.alert.findMany({
-    where: { tenantId: tenant.id, acknowledgedAt: null },
+    where: { tenantId: ctx.tenantId, acknowledgedAt: null },
     include: { tender: { select: { id: true, title: true, submissionDeadline: true } } },
     orderBy: [
       { severity: 'desc' },

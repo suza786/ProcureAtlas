@@ -1,5 +1,6 @@
 // ProcureAtlas AI — OCDS-inspired Prisma schema
-// Phase 1 dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
+// Phase 2: Auth, FileUpload, LlmExtraction, ConnectorRun, ApiKey, Notification added.
+// Dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
 // Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
 
 generator client {
@@ -29,6 +30,9 @@ model Tenant {
   pursuits    Pursuit[]
   alerts      Alert[]
   auditLogs   AuditLog[]
+  fileUploads FileUpload[]
+  llmExtractions LlmExtraction[]
+  notifications Notification[]
 }
 
 model User {
@@ -37,16 +41,44 @@ model User {
   email         String   @unique
   name          String?
   role          String   @default("viewer") // owner | admin | manager | contributor | viewer
+  passwordHash  String?  // Phase 2: bcrypt hash for credentials auth; null for SSO-only users
   mfaEnabled    Boolean  @default(false)
+  mfaSecret     String?  // Phase 2+: TOTP secret (encrypted at rest in prod)
+  mfaBackupCodes String? // Phase 2+: hashed backup codes (JSON array)
+  failedLoginCount Int   @default(0)
+  lockedUntil   DateTime?
   lastLoginAt   DateTime?
+  lastLoginIp   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions      Session[]
   approvals     Approval[]
   auditLogs     AuditLog[]
+  apiKeys       ApiKey[]
+  llmExtractionsRequested LlmExtraction[] @relation("LlmExtractionRequestedBy")
+  llmExtractionsReviewed  LlmExtraction[] @relation("LlmExtractionReviewedBy")
+  fileUploads   FileUpload[]
 
   @@index([tenantId])
+}
+
+// Phase 2: Session management (NextAuth-compatible shape, simplified)
+model Session {
+  id            String   @id @default(cuid())
+  userId        String
+  token         String   @unique
+  expiresAt     DateTime
+  ipHash        String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  revokedAt     DateTime?
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ============================================================
@@ -139,6 +171,7 @@ model Tender {
   awards          Award[]
   pursuits        Pursuit[]
   alerts          Alert[]
+  llmExtractions  LlmExtraction[]
 
   @@unique([sourcePortal, externalId])
   @@index([sourcePortal])
@@ -294,6 +327,7 @@ model Evidence {
 
   company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   complianceItems ComplianceItem[]
+  fileUploads   FileUpload[]
 
   @@index([companyId])
   @@index([category])
@@ -530,6 +564,14 @@ model AuditLog {
   afterJson     String?
   ipHash        String?
   userAgent     String?
+  // Phase 2: LLM-specific audit fields
+  llmModel      String?
+  llmPromptHash String?
+  llmInputTokens Int?
+  llmOutputTokens Int?
+  llmLatencyMs  Int?
+  llmCostUsd    Float?
+  requestId     String?
   createdAt     DateTime @default(now())
 
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -538,4 +580,147 @@ model AuditLog {
   @@index([tenantId])
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([action])
+}
+
+// ============================================================
+// Phase 2: File Uploads (evidence + tender documents)
+// ============================================================
+
+model FileUpload {
+  id            String   @id @default(cuid())
+  tenantId      String
+  uploadedById  String?
+  fileName      String
+  fileType     String   // mime type
+  fileSizeKb    Int
+  checksum      String   // sha256
+  storageKey    String   // path under tenant-scoped prefix; e.g. {tenantId}/evidence/{fileId}
+  storageUrl    String?  // signed URL or local path (dev)
+  category      String   // evidence | tender_document | bid_document | proposal
+  evidenceId    String?  // linked Evidence record (nullable until evidence is created)
+  virusScanResult String? @default("pending") // pending | clean | infected | error
+  textExtracted String?  // extracted text content (truncated to 64k for SQLite)
+  textExtractedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  uploadedBy    User?    @relation(fields: [uploadedById], references: [id])
+  evidence      Evidence? @relation(fields: [evidenceId], references: [id])
+  llmExtractions LlmExtraction[]
+
+  @@index([tenantId])
+  @@index([category])
+  @@index([evidenceId])
+}
+
+// ============================================================
+// Phase 2: LLM Extraction (evidence-gated, source-cited, human-reviewed)
+// ============================================================
+
+model LlmExtraction {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenderId      String?
+  fileUploadId  String?
+  requestedById String?
+  taskType      String   // requirement_extraction | tender_summary | classification | eligibility_narrative | translation
+  status        String   @default("pending") // pending | completed | failed | needs_review | approved | rejected
+  inputHash     String?  // hash of input text for caching
+  promptHash    String?
+  model         String?
+  inputTokens   Int?
+  outputTokens  Int?
+  latencyMs     Int?
+  costUsd       Float?
+  outputJson    String?  // raw LLM output (validated against schema)
+  extractedItemsJson String? // parsed items as JSON array
+  reviewStatus  String   @default("pending") // pending | approved | rejected | edited
+  reviewedById  String?
+  reviewedAt    DateTime?
+  reviewNotes   String?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tender        Tender?  @relation(fields: [tenderId], references: [id])
+  fileUpload    FileUpload? @relation(fields: [fileUploadId], references: [id])
+  requestedBy   User?    @relation("LlmExtractionRequestedBy", fields: [requestedById], references: [id])
+  reviewedBy    User?    @relation("LlmExtractionReviewedBy", fields: [reviewedById], references: [id])
+
+  @@index([tenantId])
+  @@index([tenderId])
+  @@index([status])
+  @@index([reviewStatus])
+}
+
+// ============================================================
+// Phase 2: Connector Run Logging (per-source ingestion audit)
+// ============================================================
+
+model ConnectorRun {
+  id            String   @id @default(cuid())
+  sourceCode    String   // cptu_bd | gebiz_sg | worldbank | ...
+  runType       String   // scheduled | manual | backfill
+  status        String   @default("running") // running | success | partial | failed
+  startedAt     DateTime @default(now())
+  completedAt   DateTime?
+  itemsFetched  Int      @default(0)
+  itemsCreated  Int      @default(0)
+  itemsUpdated  Int      @default(0)
+  itemsSkipped  Int      @default(0)
+  errorMessage  String?
+  logJson       String?  // structured run log
+  triggeredById String?
+
+  @@index([sourceCode])
+  @@index([status])
+  @@index([startedAt])
+}
+
+// ============================================================
+// Phase 2: API Keys (for MCP + public API marketplace)
+// ============================================================
+
+model ApiKey {
+  id            String   @id @default(cuid())
+  tenantId      String?  // null for platform-level keys
+  userId        String?
+  name          String
+  keyPrefix     String   // first 8 chars of key for identification
+  keyHash       String   // bcrypt hash of full key
+  scopes        String   // space-separated: mcp:read | api:read | api:write
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  revokedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([keyHash])
+}
+
+// ============================================================
+// Phase 2: Notifications (in-app + email digest)
+// ============================================================
+
+model Notification {
+  id            String   @id @default(cuid())
+  tenantId      String
+  userId        String?  // null = broadcast to tenant
+  type          String   // alert | deadline | amendment | extraction_ready | approval_request | system
+  title         String
+  message       String
+  link          String?  // relative path
+  readAt        DateTime?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([readAt])
 }
