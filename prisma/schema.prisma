@@ -1,0 +1,541 @@
+// ProcureAtlas AI — OCDS-inspired Prisma schema
+// Phase 1 dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
+// Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// Identity & Tenancy
+// ============================================================
+
+model Tenant {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  plan        String   @default("free") // free | solo | professional | bid_team | enterprise | intelligence | pursuit_pro | team
+  region      String   @default("BD")   // BD | SG | WB | ADB | UN | EU | US | GLOBAL
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  companies   Company[]
+  pursuits    Pursuit[]
+  alerts      Alert[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id            String   @id @default(cuid())
+  tenantId      String
+  email         String   @unique
+  name          String?
+  role          String   @default("viewer") // owner | admin | manager | contributor | viewer
+  mfaEnabled    Boolean  @default(false)
+  lastLoginAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  approvals     Approval[]
+  auditLogs     AuditLog[]
+
+  @@index([tenantId])
+}
+
+// ============================================================
+// Canonical Procurement Model (OCDS-inspired)
+// ============================================================
+
+model Organization {
+  id            String   @id @default(cuid())
+  externalId    String?  // ID in source portal
+  sourcePortal  String   // e.g. cptu_bd | gebiz_sg | worldbank | adb | ungm | ted | sam_gov
+  name          String
+  country       String?
+  city          String?
+  website       String?
+  orgType       String   @default("buyer") // buyer | supplier | authority | partner | oem
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  buyers        Buyer[]
+  authorities   ProcurementAuthority[]
+  awards        Award[]   @relation("AwardSupplier")
+  tendersAsSupplier Tender[] @relation("TenderSupplier")
+
+  @@unique([sourcePortal, externalId])
+  @@index([sourcePortal])
+  @@index([orgType])
+}
+
+model Buyer {
+  id            String   @id @default(cuid())
+  organizationId String
+  department    String?
+  createdAt     DateTime @default(now())
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+  tenders       Tender[]
+}
+
+model ProcurementAuthority {
+  id            String   @id @default(cuid())
+  organizationId String
+  regulatoryScope String? // e.g. national | state | sector
+  createdAt     DateTime @default(now())
+
+  organization  Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Tender {
+  id              String   @id @default(cuid())
+  externalId      String?  // ID in source portal
+  sourcePortal    String   // cptu_bd | gebiz_sg | worldbank | adb | ungm | ted | sam_gov
+  sourceUrl       String
+  title           String
+  titleLocal      String?  // original-language title preserved
+  description     String?
+  country         String
+  market          String   // BD | SG | WB | ADB | UN | EU | US
+  sector          String   // IT | Cyber | Construction | Health | Consulting | Engineering | Goods | Services
+  procurementMethod String? // open | selective | limited | direct
+  noticeType      String?  // tender | rfp | rfq | eoi | prequalification
+  currency        String   @default("USD")
+  estimatedValue  Float?
+  valueUSD        Float?
+  publishedAt     DateTime?
+  submissionDeadline DateTime?
+  questionDeadline DateTime?
+  bidValidityDays Int?
+  tenderSecurityPct Float? // % of contract value
+  performanceSecurityPct Float?
+  status          String   @default("active") // active | closed | awarded | cancelled | amended
+  awardStatus     String?  // pending | awarded | cancelled
+  contactPerson   String?
+  contactEmail    String?
+  preBidMeetingAt DateTime?
+  siteVisitAt     DateTime?
+  rawJson         String?  // raw payload from source for traceability
+  extractedAt     DateTime @default(now())
+  confidence      Float    @default(0.8) // extraction confidence 0-1
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  buyerId         String?
+  buyer           Buyer?   @relation(fields: [buyerId], references: [id])
+  supplierOrgId   String?
+  supplierOrg     Organization? @relation("TenderSupplier", fields: [supplierOrgId], references: [id])
+  lots            Lot[]
+  requirements    Requirement[]
+  documents       TenderDocument[]
+  amendments      Amendment[]
+  awards          Award[]
+  pursuits        Pursuit[]
+  alerts          Alert[]
+
+  @@unique([sourcePortal, externalId])
+  @@index([sourcePortal])
+  @@index([market])
+  @@index([sector])
+  @@index([status])
+  @@index([submissionDeadline])
+}
+
+model Lot {
+  id          String   @id @default(cuid())
+  tenderId    String
+  externalId  String?
+  title       String
+  description String?
+  quantity    Float?
+  unit        String?
+  estimatedValue Float?
+  currency    String   @default("USD")
+  createdAt   DateTime @default(now())
+
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  requirements Requirement[]
+
+  @@index([tenderId])
+}
+
+model Requirement {
+  id            String   @id @default(cuid())
+  tenderId      String
+  lotId         String?
+  category      String   // eligibility | technical | financial | legal | experience | certification | document
+  criterion     String   // e.g. "Minimum annual turnover"
+  operator      String?  // >= | <= | == | contains | mandatory
+  threshold     String?  // e.g. "5000000 USD"
+  description   String?
+  isMandatory   Boolean  @default(true)
+  sourceDoc     String?  // document name where requirement was extracted from
+  sourcePage    Int?
+  sourceClause  String?
+  extractedText String?
+  confidence    Float    @default(0.85)
+  createdAt     DateTime @default(now())
+
+  tender        Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  lot           Lot?     @relation(fields: [lotId], references: [id])
+  complianceItems ComplianceItem[]
+
+  @@index([tenderId])
+  @@index([category])
+}
+
+model TenderDocument {
+  id            String   @id @default(cuid())
+  tenderId      String
+  name          String
+  docType       String?  // notice | specification | addendum | drawing | form | boq
+  sourceUrl     String?
+  fileSizeKb    Int?
+  checksum      String?
+  uploadedAt    DateTime?
+  createdAt     DateTime @default(now())
+
+  tender        Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId])
+}
+
+model Amendment {
+  id            String   @id @default(cuid())
+  tenderId      String
+  amendmentNo   Int
+  title         String
+  description   String
+  publishedAt   DateTime
+  affectsDeadline Boolean @default(false)
+  affectsScope  Boolean  @default(false)
+  newDeadline   DateTime?
+  sourceUrl     String?
+  createdAt     DateTime @default(now())
+
+  tender        Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenderId])
+}
+
+model Award {
+  id            String   @id @default(cuid())
+  tenderId      String
+  supplierOrgId String
+  contractValue Float?
+  currency      String   @default("USD")
+  awardedAt     DateTime
+  contractNo    String?
+  sourceUrl     String?
+  createdAt     DateTime @default(now())
+
+  tender        Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  supplier      Organization @relation("AwardSupplier", fields: [supplierOrgId], references: [id])
+
+  @@index([tenderId])
+  @@index([supplierOrgId])
+}
+
+// ============================================================
+// Company Brain (tenant-owned evidence)
+// ============================================================
+
+model Company {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  legalName     String?
+  country       String
+  city          String?
+  registrationNo String?
+  taxId         String?
+  website       String?
+  foundedYear   Int?
+  employeeCount Int?
+  annualTurnoverUSD Float?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  evidence      Evidence[]
+  certifications Certification[]
+  projectRefs   ProjectReference[]
+  employees     Employee[]
+  pursuits      Pursuit[]
+
+  @@index([tenantId])
+}
+
+model Evidence {
+  id            String   @id @default(cuid())
+  companyId     String
+  category      String   // registration | financial | certification | project | oem | partnership | employee | facility | equipment | catalogue | reference | proposal_library | past_response | past_win | past_loss
+  title         String
+  description   String?
+  issuer        String?  // who issued the evidence
+  issuedAt      DateTime?
+  expiresAt     DateTime?
+  docUrl        String?
+  checksum      String?
+  verified      Boolean  @default(false)
+  verifiedBy    String?
+  verifiedAt    DateTime?
+  confidence    Float    @default(0.9)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  complianceItems ComplianceItem[]
+
+  @@index([companyId])
+  @@index([category])
+  @@index([expiresAt])
+}
+
+model Certification {
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String   // ISO 27001 | ISO 9001 | CMMI L3 | SOC 2 | Cisco Gold | Microsoft AOSP
+  standard      String?
+  issuer        String?
+  issuedAt      DateTime?
+  expiresAt     DateTime?
+  certificateNo String?
+  docUrl        String?
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([expiresAt])
+}
+
+model ProjectReference {
+  id            String   @id @default(cuid())
+  companyId     String
+  title         String
+  client        String
+  clientType    String?  // government | private | multilateral | ngo
+  country       String?
+  valueUSD      Float?
+  startDate     DateTime?
+  endDate       DateTime?
+  role          String?  // prime | subcontractor | consortium | oem | implementer
+  description   String?
+  evidenceUrl   String?
+  verified      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([clientType])
+}
+
+model Employee {
+  id            String   @id @default(cuid())
+  companyId     String
+  name          String
+  role          String?
+  qualifications String? // comma-separated certifications
+  yearsExperience Int?
+  securityClearance String?
+  cvUrl         String?
+  createdAt     DateTime @default(now())
+
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+}
+
+// ============================================================
+// Pursuits & Bids
+// ============================================================
+
+model Pursuit {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenderId      String
+  companyId     String
+  stage         String   @default("discovering") // discovering | qualifying | bidding | submitted | won | lost | no_bid
+  bidDecision   String?  // bid | no_bid | pending
+  decisionReason String?
+  decisionBy    String?
+  decidedAt     DateTime?
+  ownerId       String?
+  priority      String   @default("medium") // low | medium | high | strategic
+  estimatedValueUSD Float?
+  winProbability Float?  // 0-1 (separate from deterministic scores; for forecasting only)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tender        Tender   @relation(fields: [tenderId], references: [id])
+  company       Company  @relation(fields: [companyId], references: [id])
+  bid           Bid?
+  complianceItems ComplianceItem[]
+  tasks         Task[]
+  approvals     Approval[]
+
+  @@index([tenantId])
+  @@index([stage])
+  @@index([companyId])
+}
+
+model Bid {
+  id            String   @id @default(cuid())
+  pursuitId     String   @unique
+  status        String   @default("draft") // draft | in_review | approved | submitted | withdrawn
+  technicalScore Float?
+  commercialScore Float?
+  totalScore    Float?
+  submissionReady Boolean @default(false)
+  submittedAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  pursuit       Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+
+  @@index([pursuitId])
+}
+
+model ComplianceItem {
+  id            String   @id @default(cuid())
+  pursuitId     String
+  requirementId String
+  evidenceId    String?
+  status        String   @default("gap") // compliant | partial | gap | not_applicable
+  notes         String?
+  evidenceText  String?  // extracted snippet from evidence doc
+  confidence    Float    @default(0)
+  owner         String?
+  dueAt         DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  pursuit       Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+  requirement   Requirement @relation(fields: [requirementId], references: [id])
+  evidence      Evidence? @relation(fields: [evidenceId], references: [id])
+
+  @@index([pursuitId])
+  @@index([status])
+}
+
+model Task {
+  id            String   @id @default(cuid())
+  pursuitId     String
+  bidId         String?
+  title         String
+  description   String?
+  assignee      String?
+  status        String   @default("todo") // todo | in_progress | in_review | done | blocked
+  priority      String   @default("medium")
+  dueAt         DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  pursuit       Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+  bid           Bid?     @relation(fields: [bidId], references: [id])
+
+  @@index([pursuitId])
+  @@index([status])
+}
+
+model Approval {
+  id            String   @id @default(cuid())
+  pursuitId     String
+  requestedBy   String
+  approverId    String?
+  decision      String   @default("pending") // pending | approved | rejected | changes_requested
+  reason        String?
+  decidedAt     DateTime?
+  createdAt     DateTime @default(now())
+
+  pursuit       Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+  approver      User?    @relation(fields: [approverId], references: [id])
+
+  @@index([pursuitId])
+  @@index([decision])
+}
+
+// ============================================================
+// Alerts & Outcomes
+// ============================================================
+
+model Alert {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenderId      String?
+  type          String   // deadline | amendment | new_opportunity | eligibility_gap | evidence_expiry | award
+  severity      String   @default("medium") // low | medium | high | critical
+  title         String
+  message       String
+  dueAt         DateTime?
+  acknowledgedAt DateTime?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tender        Tender?  @relation(fields: [tenderId], references: [id])
+
+  @@index([tenantId])
+  @@index([severity])
+}
+
+model Outcome {
+  id            String   @id @default(cuid())
+  pursuitId     String   @unique
+  result        String   // won | lost | withdrawn | disqualified | no_decision
+  awardValueUSD Float?
+  lossReason    String?
+  lessonsLearned String?
+  recordedAt    DateTime @default(now())
+}
+
+// ============================================================
+// Data Source Registry & Audit
+// ============================================================
+
+model DataSource {
+  id            String   @id @default(cuid())
+  code          String   @unique // cptu_bd | gebiz_sg | worldbank | adb | ungm | ted | sam_gov
+  name          String
+  country       String
+  url           String
+  accessMethod  String   // official_api | public_feed | rss | open_data | permitted_pages | user_upload
+  legalStatus   String   @default("verified") // verified | under_review | prohibited
+  lastReviewedAt DateTime?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  tenantId      String
+  userId        String?
+  action        String
+  entityType    String
+  entityId      String?
+  beforeJson    String?
+  afterJson     String?
+  ipHash        String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
