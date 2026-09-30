@@ -16,6 +16,14 @@ export type View =
   | { type: 'connectors' }
   | { type: 'settings' }
   | { type: 'sign-in' }
+  | { type: 'buyer-intel' }
+  | { type: 'buyer-detail'; organizationId: string }
+  | { type: 'award-intel' }
+  | { type: 'competitor-intel' }
+  | { type: 'competitor-detail'; organizationId: string }
+  | { type: 'partner-finder' }
+  | { type: 'admin' }
+  | { type: 'billing' }
 
 interface DiscoverFilters {
   market: string
@@ -52,6 +60,14 @@ interface AppState {
   goConnectors: () => void
   goSettings: () => void
   goSignIn: () => void
+  goBuyerIntel: () => void
+  openBuyerDetail: (organizationId: string) => void
+  goAwardIntel: () => void
+  goCompetitorIntel: () => void
+  openCompetitorDetail: (organizationId: string) => void
+  goPartnerFinder: () => void
+  goAdmin: () => void
+  goBilling: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -77,4 +93,12 @@ export const useAppStore = create<AppState>((set) => ({
   goConnectors: () => set({ view: { type: 'connectors' } }),
   goSettings: () => set({ view: { type: 'settings' } }),
   goSignIn: () => set({ view: { type: 'sign-in' } }),
+  goBuyerIntel: () => set({ view: { type: 'buyer-intel' } }),
+  openBuyerDetail: (organizationId) => set({ view: { type: 'buyer-detail', organizationId } }),
+  goAwardIntel: () => set({ view: { type: 'award-intel' } }),
+  goCompetitorIntel: () => set({ view: { type: 'competitor-intel' } }),
+  openCompetitorDetail: (organizationId) => set({ view: { type: 'competitor-detail', organizationId } }),
+  goPartnerFinder: () => set({ view: { type: 'partner-finder' } }),
+  goAdmin: () => set({ view: { type: 'admin' } }),
+  goBilling: () => set({ view: { type: 'billing' } }),
 }))

@@ -15,6 +15,9 @@ import {
   Shield,
   Cpu,
   Globe,
+  Building2,
+  Handshake,
+  CreditCard,
 } from 'lucide-react'
 
 const navItems = [
@@ -29,6 +32,19 @@ const navItems = [
   { id: 'alerts', label: 'Alerts', icon: Bell, action: 'goCommand' as const },
 ] as const
 
+const intelligenceItems = [
+  { id: 'buyer-intel', label: 'Buyer Intelligence', icon: Building2, action: 'goBuyerIntel' as const },
+  { id: 'award-intel', label: 'Award Intelligence', icon: Gavel, action: 'goAwardIntel' as const },
+  { id: 'competitor-intel', label: 'Competitor Intelligence', icon: Target, action: 'goCompetitorIntel' as const },
+  { id: 'partner-finder', label: 'Partner / JV Finder', icon: Handshake, action: 'goPartnerFinder' as const },
+] as const
+
+const systemItems = [
+  { id: 'admin', label: 'Admin Console', icon: Shield, action: 'goAdmin' as const },
+  { id: 'billing', label: 'Billing & Usage', icon: CreditCard, action: 'goBilling' as const },
+  { id: 'settings', label: 'Settings & API Keys', icon: Settings, action: 'goSettings' as const },
+] as const
+
 export function Sidebar() {
   const view = useAppStore((s) => s.view)
   const auth = useAppStore((s) => s.auth)
@@ -40,8 +56,14 @@ export function Sidebar() {
   const goExtractions = useAppStore((s) => s.goExtractions)
   const goConnectors = useAppStore((s) => s.goConnectors)
   const goSettings = useAppStore((s) => s.goSettings)
+  const goBuyerIntel = useAppStore((s) => s.goBuyerIntel)
+  const goAwardIntel = useAppStore((s) => s.goAwardIntel)
+  const goCompetitorIntel = useAppStore((s) => s.goCompetitorIntel)
+  const goPartnerFinder = useAppStore((s) => s.goPartnerFinder)
+  const goAdmin = useAppStore((s) => s.goAdmin)
+  const goBilling = useAppStore((s) => s.goBilling)
 
-  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings }
+  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling }
 
   const isActive = (id: string) => {
     if (id === 'command' && view.type === 'command') return true
@@ -51,6 +73,13 @@ export function Sidebar() {
     if (id === 'extractions' && view.type === 'extractions') return true
     if (id === 'connectors' && view.type === 'connectors') return true
     if (id === 'audit' && view.type === 'audit') return true
+    if (id === 'buyer-intel' && (view.type === 'buyer-intel' || view.type === 'buyer-detail')) return true
+    if (id === 'award-intel' && view.type === 'award-intel') return true
+    if (id === 'competitor-intel' && (view.type === 'competitor-intel' || view.type === 'competitor-detail')) return true
+    if (id === 'partner-finder' && view.type === 'partner-finder') return true
+    if (id === 'admin' && view.type === 'admin') return true
+    if (id === 'billing' && view.type === 'billing') return true
+    if (id === 'settings' && view.type === 'settings') return true
     return false
   }
 
@@ -62,7 +91,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-slate-900">ProcureAtlas</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 2</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 3</span>
         </div>
       </div>
 
@@ -94,25 +123,23 @@ export function Sidebar() {
         </ul>
 
         <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Intelligence (Phase 3)
+          Intelligence
         </div>
         <ul className="space-y-0.5">
-          {[
-            { label: 'Buyer Intel', icon: Search },
-            { label: 'Award Intel', icon: Gavel },
-            { label: 'Competitor Intel', icon: Target },
-            { label: 'Partner / JV', icon: Brain },
-          ].map((item) => {
+          {intelligenceItems.map((item) => {
             const Icon = item.icon
+            const active = isActive(item.id)
             return (
-              <li key={item.label}>
+              <li key={item.id}>
                 <button
-                  className="flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 cursor-not-allowed"
-                  title="Coming in Phase 3"
+                  onClick={() => actionMap[item.action]()}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+                    active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                  )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
-                  <span className="ml-auto text-[9px] uppercase tracking-wider text-slate-400">soon</span>
                 </button>
               </li>
             )
@@ -123,18 +150,24 @@ export function Sidebar() {
           System
         </div>
         <ul className="space-y-0.5">
-          <li>
-            <button
-              onClick={goSettings}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-                view.type === 'settings' ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
-              )}
-            >
-              <Settings className="h-4 w-4 shrink-0" />
-              <span className="truncate">Settings & API Keys</span>
-            </button>
-          </li>
+          {systemItems.map((item) => {
+            const Icon = item.icon
+            const active = isActive(item.id)
+            return (
+              <li key={item.id}>
+                <button
+                  onClick={() => actionMap[item.action]()}
+                  className={cn(
+                    'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
+                    active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                  )}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       </nav>
 

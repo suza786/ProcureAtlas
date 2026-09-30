@@ -1,5 +1,5 @@
 // ProcureAtlas AI — OCDS-inspired Prisma schema
-// Phase 2: Auth, FileUpload, LlmExtraction, ConnectorRun, ApiKey, Notification added.
+// Phase 3: Intelligence Layer — SupplierProfile, BuyerProfile, CompetitorProfile, PartnerSuggestion, Subscription, UsageMetric, Invoice added.
 // Dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
 // Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
 
@@ -33,6 +33,8 @@ model Tenant {
   fileUploads FileUpload[]
   llmExtractions LlmExtraction[]
   notifications Notification[]
+  partnerSuggestions PartnerSuggestion[]
+  subscription Subscription?
 }
 
 model User {
@@ -101,6 +103,9 @@ model Organization {
   authorities   ProcurementAuthority[]
   awards        Award[]   @relation("AwardSupplier")
   tendersAsSupplier Tender[] @relation("TenderSupplier")
+  buyerProfile  BuyerProfile?
+  supplierProfile SupplierProfile?
+  partnerSuggestions PartnerSuggestion[]
 
   @@unique([sourcePortal, externalId])
   @@index([sourcePortal])
@@ -723,4 +728,151 @@ model Notification {
   @@index([tenantId])
   @@index([userId])
   @@index([readAt])
+}
+
+// ============================================================
+// Phase 3: Intelligence Layer — Buyer, Award, Competitor, Partner
+// ============================================================
+
+// Enriched buyer profile — aggregated from Awards + Tenders
+model BuyerProfile {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  totalTendersPosted Int    @default(0)
+  totalAwardValueUSD Float  @default(0)
+  averageAwardValueUSD Float @default(0)
+  topSuppliers    String?  // JSON array of {supplierId, name, awardCount, totalValue}
+  preferredSectors String? // JSON array of sector codes with counts
+  averageTenderValueUSD Float @default(0)
+  incumbentCount  Int      @default(0) // distinct suppliers with >=1 award
+  firstTenderAt   DateTime?
+  lastTenderAt    DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// Enriched supplier/competitor profile — aggregated from Awards
+model SupplierProfile {
+  id              String   @id @default(cuid())
+  organizationId  String   @unique
+  totalAwards     Int      @default(0)
+  totalAwardValueUSD Float  @default(0)
+  averageAwardValueUSD Float @default(0)
+  winRate         Float    @default(0) // estimated; awards / (awards + known losses)
+  topBuyers       String?  // JSON array of {buyerId, name, awardCount, totalValue}
+  sectorsWon      String?  // JSON array of sector codes with counts
+  countriesWon    String?  // JSON array of country codes with counts
+  firstAwardAt    DateTime?
+  lastAwardAt     DateTime?
+  isCompetitor    Boolean  @default(false) // flagged as competitor to current tenant
+  isPartner       Boolean  @default(false) // flagged as potential partner
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([isCompetitor])
+  @@index([isPartner])
+}
+
+// Partner / JV suggestion — computed matching score
+model PartnerSuggestion {
+  id              String   @id @default(cuid())
+  tenantId        String
+  organizationId  String   // the suggested partner org
+  matchScore      Float    // 0-1
+  matchReasons    String?  // JSON array of {reason, weight}
+  complementaryCapabilities String? // JSON array
+  geographicOverlap String? // JSON array of overlapping markets
+  priorJVHistory  Boolean  @default(false)
+  status          String   @default("suggested") // suggested | contacted | engaged | rejected
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([organizationId])
+  @@index([matchScore])
+}
+
+// ============================================================
+// Phase 3: Billing — Subscriptions, Usage Metrics, Invoices
+// ============================================================
+
+model Subscription {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  plan            String   @default("free") // free | solo | professional | bid_team | enterprise | intelligence | pursuit_pro | team
+  status          String   @default("active") // active | past_due | canceled | trialing
+  billingCycle    String   @default("monthly") // monthly | yearly
+  seatsIncluded   Int      @default(1)
+  tendersTrackedLimit Int  @default(50)
+  pursuitsLimit   Int      @default(5)
+  apiCallsLimit   Int      @default(1000)
+  llmTokensLimit  Int      @default(50000)
+  currentPeriodStart DateTime?
+  currentPeriodEnd DateTime?
+  cancelAtPeriodEnd Boolean @default(false)
+  stripeCustomerId String?
+  stripeSubscriptionId String?
+  sslcommerzStoreId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoices        Invoice[]
+  usageMetrics    UsageMetric[]
+
+  @@index([tenantId])
+}
+
+model UsageMetric {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  tenantId        String
+  metricType      String   // api_calls | llm_tokens | tenders_tracked | pursuits | file_uploads
+  periodStart     DateTime
+  periodEnd       DateTime
+  count           Int      @default(0)
+  limit           Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriptionId, metricType, periodStart])
+  @@index([tenantId])
+  @@index([metricType])
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  subscriptionId  String
+  tenantId        String
+  invoiceNumber   String   @unique
+  amount          Float
+  currency        String   @default("USD")
+  status          String   @default("pending") // pending | paid | void | refunded
+  periodStart     DateTime
+  periodEnd       DateTime
+  paidAt          DateTime?
+  pdfUrl          String?
+  lineItemsJson   String?  // JSON array of line items
+  createdAt       DateTime @default(now())
+
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([tenantId])
+  @@index([status])
 }

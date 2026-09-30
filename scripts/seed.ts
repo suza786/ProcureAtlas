@@ -18,6 +18,12 @@ async function main() {
   console.log('🌱 Seeding ProcureAtlas AI demo data...')
 
   // Clean (order matters for FK constraints)
+  await prisma.invoice.deleteMany()
+  await prisma.usageMetric.deleteMany()
+  await prisma.subscription.deleteMany()
+  await prisma.partnerSuggestion.deleteMany()
+  await prisma.supplierProfile.deleteMany()
+  await prisma.buyerProfile.deleteMany()
   await prisma.notification.deleteMany()
   await prisma.apiKey.deleteMany()
   await prisma.connectorRun.deleteMany()
@@ -789,12 +795,166 @@ async function main() {
     ],
   })
 
+  // ---------- Phase 3: Additional suppliers + awards for intelligence layer ----------
+  const additionalSuppliers = await Promise.all([
+    prisma.organization.create({ data: { sourcePortal: 'cptu_bd', externalId: 'SUP-004', name: 'DataSoft Systems Bangladesh', country: 'BD', city: 'Dhaka', orgType: 'supplier', website: 'https://datasoft.ws' } }),
+    prisma.organization.create({ data: { sourcePortal: 'cptu_bd', externalId: 'SUP-005', name: 'LEADS Corporation Ltd', country: 'BD', city: 'Dhaka', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'gebiz_sg', externalId: 'SUP-006', name: 'NCS Group', country: 'SG', city: 'Singapore', orgType: 'supplier', website: 'https://ncs.com.sg' } }),
+    prisma.organization.create({ data: { sourcePortal: 'gebiz_sg', externalId: 'SUP-007', name: 'ST Engineering Electronics', country: 'SG', city: 'Singapore', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'worldbank', externalId: 'SUP-008', name: 'Deloitte Consulting', country: 'US', city: 'New York', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'worldbank', externalId: 'SUP-009', name: 'PwC Advisory', country: 'GB', city: 'London', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'ted', externalId: 'SUP-010', name: 'Atos IT Solutions', country: 'FR', city: 'Paris', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'sam_gov', externalId: 'SUP-011', name: 'Booz Allen Hamilton', country: 'US', city: 'McLean', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'sam_gov', externalId: 'SUP-012', name: 'Leidos Cybersecurity', country: 'US', city: 'Reston', orgType: 'supplier' } }),
+    prisma.organization.create({ data: { sourcePortal: 'ungm', externalId: 'SUP-013', name: 'Wipro Technologies', country: 'IN', city: 'Bangalore', orgType: 'supplier' } }),
+  ])
+
+  // Mark some as competitors and some as potential partners
+  await prisma.supplierProfile.createMany({
+    data: [
+      { organizationId: additionalSuppliers[0].id, isCompetitor: true, totalAwards: 8, totalAwardValueUSD: 1200000, averageAwardValueUSD: 150000, firstAwardAt: daysAgo(900), lastAwardAt: daysAgo(30) },
+      { organizationId: additionalSuppliers[1].id, isCompetitor: true, totalAwards: 5, totalAwardValueUSD: 680000, averageAwardValueUSD: 136000, firstAwardAt: daysAgo(700), lastAwardAt: daysAgo(60) },
+      { organizationId: additionalSuppliers[2].id, isCompetitor: false, isPartner: true, totalAwards: 12, totalAwardValueUSD: 3400000, averageAwardValueUSD: 283000, firstAwardAt: daysAgo(1200), lastAwardAt: daysAgo(15) },
+      { organizationId: additionalSuppliers[3].id, isCompetitor: true, totalAwards: 7, totalAwardValueUSD: 2100000, averageAwardValueUSD: 300000, firstAwardAt: daysAgo(1000), lastAwardAt: daysAgo(45) },
+      { organizationId: additionalSuppliers[4].id, isCompetitor: true, totalAwards: 15, totalAwardValueUSD: 8500000, averageAwardValueUSD: 566000, firstAwardAt: daysAgo(1500), lastAwardAt: daysAgo(10) },
+      { organizationId: additionalSuppliers[5].id, isCompetitor: true, totalAwards: 9, totalAwardValueUSD: 4200000, averageAwardValueUSD: 466000, firstAwardAt: daysAgo(1100), lastAwardAt: daysAgo(25) },
+      { organizationId: additionalSuppliers[6].id, isCompetitor: false, isPartner: true, totalAwards: 6, totalAwardValueUSD: 1800000, averageAwardValueUSD: 300000, firstAwardAt: daysAgo(800), lastAwardAt: daysAgo(50) },
+      { organizationId: additionalSuppliers[7].id, isCompetitor: true, totalAwards: 20, totalAwardValueUSD: 12000000, averageAwardValueUSD: 600000, firstAwardAt: daysAgo(2000), lastAwardAt: daysAgo(5) },
+      { organizationId: additionalSuppliers[8].id, isCompetitor: true, totalAwards: 11, totalAwardValueUSD: 5500000, averageAwardValueUSD: 500000, firstAwardAt: daysAgo(1300), lastAwardAt: daysAgo(20) },
+      { organizationId: additionalSuppliers[9].id, isCompetitor: false, isPartner: true, totalAwards: 14, totalAwardValueUSD: 6200000, averageAwardValueUSD: 443000, firstAwardAt: daysAgo(1400), lastAwardAt: daysAgo(12) },
+    ],
+  })
+
+  // Also create profiles for the original 3 suppliers
+  await prisma.supplierProfile.createMany({
+    data: [
+      { organizationId: orgs[10].id, isCompetitor: true, totalAwards: 3, totalAwardValueUSD: 450000, averageAwardValueUSD: 150000, firstAwardAt: daysAgo(400), lastAwardAt: daysAgo(40) },
+      { organizationId: orgs[11].id, isCompetitor: true, totalAwards: 2, totalAwardValueUSD: 280000, averageAwardValueUSD: 140000, firstAwardAt: daysAgo(300), lastAwardAt: daysAgo(60) },
+      { organizationId: orgs[12].id, isCompetitor: false, isPartner: true, totalAwards: 4, totalAwardValueUSD: 890000, averageAwardValueUSD: 222000, firstAwardAt: daysAgo(600), lastAwardAt: daysAgo(110) },
+    ],
+  })
+
+  // Create buyer profiles
+  await prisma.buyerProfile.createMany({
+    data: [
+      { organizationId: orgs[0].id, totalTendersPosted: 15, totalAwardValueUSD: 2400000, averageAwardValueUSD: 200000, incumbentCount: 4, firstTenderAt: daysAgo(800), lastTenderAt: daysAgo(14) },
+      { organizationId: orgs[3].id, totalTendersPosted: 22, totalAwardValueUSD: 5600000, averageAwardValueUSD: 280000, incumbentCount: 6, firstTenderAt: daysAgo(1000), lastTenderAt: daysAgo(10) },
+      { organizationId: orgs[8].id, totalTendersPosted: 8, totalAwardValueUSD: 8900000, averageAwardValueUSD: 1200000, incumbentCount: 3, firstTenderAt: daysAgo(600), lastTenderAt: daysAgo(18) },
+    ],
+  })
+
+  // Create additional awards for richer intelligence
+  // We need buyer IDs — get them from the buyers array
+  const buyerIds = buyers.map(b => b.id)
+  const allSuppliers = [...orgs.slice(10, 13), ...additionalSuppliers]
+
+  // Create 12 additional awards across different buyers, suppliers, and time periods
+  const additionalAwards = [
+    { tenderIdx: 0, supplierIdx: 3, buyerIdx: 0, value: 850000, awardedAt: daysAgo(120) }, // BCC -> DataSoft
+    { tenderIdx: 0, supplierIdx: 4, buyerIdx: 0, value: 1200000, awardedAt: daysAgo(200) }, // BCC -> LEADS
+    { tenderIdx: 2, supplierIdx: 5, buyerIdx: 3, value: 1800000, awardedAt: daysAgo(90) }, // GovTech -> NCS Group
+    { tenderIdx: 2, supplierIdx: 6, buyerIdx: 3, value: 2200000, awardedAt: daysAgo(150) }, // GovTech -> ST Engineering
+    { tenderIdx: 4, supplierIdx: 7, buyerIdx: 5, value: 450000, awardedAt: daysAgo(80) }, // WB -> Deloitte
+    { tenderIdx: 4, supplierIdx: 8, buyerIdx: 5, value: 380000, awardedAt: daysAgo(130) }, // WB -> PwC
+    { tenderIdx: 7, supplierIdx: 9, buyerIdx: 8, value: 3200000, awardedAt: daysAgo(60) }, // EU TED -> Atos
+    { tenderIdx: 8, supplierIdx: 10, buyerIdx: 9, value: 1500000, awardedAt: daysAgo(45) }, // GSA -> Booz Allen
+    { tenderIdx: 8, supplierIdx: 11, buyerIdx: 9, value: 2800000, awardedAt: daysAgo(100) }, // GSA -> Leidos
+    { tenderIdx: 6, supplierIdx: 12, buyerIdx: 7, value: 95000, awardedAt: daysAgo(70) }, // UNDP -> Wipro
+    { tenderIdx: 0, supplierIdx: 0, buyerIdx: 0, value: 670000, awardedAt: daysAgo(300) }, // BCC -> CyberNet
+    { tenderIdx: 2, supplierIdx: 1, buyerIdx: 3, value: 450000, awardedAt: daysAgo(250) }, // GovTech -> NexaTech
+  ]
+
+  // Find the actual tender IDs from the created tenders
+  const allTenders = await prisma.tender.findMany({ select: { id: true, title: true, buyerId: true } })
+
+  for (const aw of additionalAwards) {
+    // Find a tender by buyer
+    const tender = allTenders.find(t => t.buyerId === buyerIds[aw.buyerIdx])
+    if (!tender) continue
+    const supplier = allSuppliers[aw.supplierIdx]
+    if (!supplier) continue
+    await prisma.award.create({
+      data: {
+        tenderId: tender.id,
+        supplierOrgId: supplier.id,
+        contractValue: aw.value,
+        currency: 'USD',
+        awardedAt: aw.awardedAt,
+        sourceUrl: `https://example.com/award/${tender.id.slice(-8)}`,
+      },
+    }).catch(() => { /* skip duplicates */ })
+  }
+
+  // Create partner suggestions for the demo tenant
+  const partnerSuggestionsData = [
+    { orgIdx: 2, score: 0.78, reasons: ['Complementary construction capabilities', 'Geographic overlap in BD', 'Prior JV history'] }, // InfraCo Asia
+    { orgIdx: 7, score: 0.72, reasons: ['Complementary consulting capabilities', 'Multilateral bank experience', 'Geographic overlap'] }, // Deloitte
+    { orgIdx: 9, score: 0.68, reasons: ['Complementary EU presence', 'Certification complementarity'] }, // Atos
+    { orgIdx: 12, score: 0.65, reasons: ['Complementary IT capacity', 'Geographic overlap in BD', 'Large-scale project experience'] }, // Wipro
+  ]
+
+  for (const ps of partnerSuggestionsData) {
+    const org = allSuppliers[ps.orgIdx]
+    if (!org) continue
+    await prisma.partnerSuggestion.create({
+      data: {
+        tenantId: tenant.id,
+        organizationId: org.id,
+        matchScore: ps.score,
+        matchReasons: JSON.stringify(ps.reasons.map(r => ({ reason: r, weight: 0.2 }))),
+        complementaryCapabilities: JSON.stringify(['Construction', 'Consulting', 'EU Market Access']),
+        geographicOverlap: JSON.stringify(['BD', 'SG']),
+        priorJVHistory: ps.orgIdx === 2,
+        status: 'suggested',
+      },
+    }).catch(() => { /* skip if exists */ })
+  }
+
+  // Create subscription for the tenant
+  await prisma.subscription.create({
+    data: {
+      tenantId: tenant.id,
+      plan: tenant.plan,
+      status: 'active',
+      billingCycle: 'monthly',
+      seatsIncluded: 3,
+      tendersTrackedLimit: 200,
+      pursuitsLimit: 20,
+      apiCallsLimit: 5000,
+      llmTokensLimit: 200000,
+      currentPeriodStart: daysAgo(15),
+      currentPeriodEnd: daysFromNow(15),
+    },
+  }).catch(() => { /* skip if exists */ })
+
+  // Create a sample invoice
+  const sub = await prisma.subscription.findUnique({ where: { tenantId: tenant.id } })
+  if (sub) {
+    await prisma.invoice.create({
+      data: {
+        subscriptionId: sub.id,
+        tenantId: tenant.id,
+        invoiceNumber: `INV-2026-001`,
+        amount: 149,
+        currency: 'USD',
+        status: 'paid',
+        periodStart: daysAgo(45),
+        periodEnd: daysAgo(15),
+        paidAt: daysAgo(15),
+        lineItemsJson: JSON.stringify([
+          { description: 'Professional Plan — Monthly', amount: 149, quantity: 1 },
+        ]),
+      },
+    }).catch(() => {})
+  }
+
   console.log('✅ Seed complete.')
   console.log(`   Tenant: ${tenant.id}`)
   console.log(`   Company: ${company.id}`)
   console.log(`   Tenders: ${createdTenders.length}`)
   console.log(`   Pursuits: ${activeTenders.length}`)
   console.log(`   Users: 3 (owner/manager/contributor) — password: demo1234`)
+  console.log(`   Suppliers: ${allSuppliers.length} (with profiles + awards)`)
 }
 
 main()

@@ -64,6 +64,36 @@ Stage Summary:
 - 6 screenshots saved documenting Phase 2 features
 
 ---
+Task ID: 3
+Agent: main
+Task: Phase 3 — Intelligence Layer (Buyer, Award, Competitor, Partner) + Admin + Billing
+
+Work Log:
+- Extended Prisma schema with 7 new models: BuyerProfile, SupplierProfile, PartnerSuggestion, Subscription, UsageMetric, Invoice
+- Built semantic matching engine (src/lib/matching.ts) with computeTenderCompanyMatch() and computePartnerMatch() — deterministic tag+keyword+capability scoring, pgvector-ready
+- Built Buyer Intelligence: API (GET /api/buyers, GET /api/buyers/[id]) + UI with buyer list table, buyer detail with incumbent mapping, sector preferences, award history
+- Built Award Intelligence: API (GET /api/awards) + UI with KPI tiles, Awards by Market chart, Market Share pie chart, Top Suppliers table, Recent Awards table
+- Built Competitor Intelligence: API (GET /api/competitors, GET /api/competitors/[id]) + UI with competitor cards, detail page with Win Trend chart, Top Buyers, Sector/Market breakdowns
+- Built Partner/JV Finder: API (GET /api/partners) + UI with match score grid, complementary capabilities, detail drawer with 5 match dimensions
+- Built faceted search API (GET /api/search) across tenders, awards, buyers, suppliers with faceted counts
+- Built semantic match API (GET /api/match/tender/[tenderId])
+- Built Admin Console: API (GET /api/admin/users, PATCH/DELETE /api/admin/users/[id], GET /api/admin/system) + UI with User Management tab (RBAC-enforced) and System Health tab
+- Built Billing foundation: API (GET /api/billing/usage, GET/PATCH /api/billing/subscription) + UI with current plan, usage meters, plan selection grid, invoice history
+- Extended seed script with 10 additional suppliers, 13 SupplierProfiles, 3 BuyerProfiles, 12 additional Awards, 4 PartnerSuggestions, 1 Subscription, 1 Invoice
+- Updated Sidebar with Intelligence section (Buyer/Award/Competitor/Partner) and System section (Admin/Billing/Settings)
+- Updated store with 8 new view types (buyer-intel, buyer-detail, award-intel, competitor-intel, competitor-detail, partner-finder, admin, billing)
+- Wired all new views into page.tsx
+- Updated sidebar label from "Phase 2" to "Phase 3"
+
+Stage Summary:
+- Phase 3 complete and verified: 4 intelligence modules (Buyer, Award, Competitor, Partner), semantic matching, faceted search, Admin Console, Billing foundation
+- 15 new API routes added (total 41 across Phases 1-3)
+- 13 suppliers with profiles, 14 awards totaling $37.95M, 8 buyers with aggregated stats
+- All APIs verified with real data via curl
+- Agent-browser verified: Award Intelligence, Partner Finder, Competitor Intelligence, Billing, Admin Console all render with real data
+- Lint passes; 7 screenshots saved documenting Phase 3 features
+
+---
 Task ID: 1-docs
 Agent: general-purpose (docs sub-agent)
 Task: Write ProcureAtlas documentation suite (20 files under /docs)

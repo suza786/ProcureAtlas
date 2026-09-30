@@ -16,6 +16,12 @@ import { AuditLog } from '@/components/views/AuditLog'
 import { Extractions } from '@/components/views/Extractions'
 import { Connectors } from '@/components/views/Connectors'
 import { Settings } from '@/components/views/Settings'
+import { BuyerIntel, BuyerDetail } from '@/components/views/BuyerIntel'
+import { AwardIntel } from '@/components/views/AwardIntel'
+import { CompetitorIntel, CompetitorDetail } from '@/components/views/CompetitorIntel'
+import { PartnerFinder } from '@/components/views/PartnerFinder'
+import { Admin } from '@/components/views/Admin'
+import { Billing } from '@/components/views/Billing'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
@@ -31,11 +37,8 @@ export default function Home() {
         if (me.authenticated) {
           setAuth({ authenticated: true, user: me.user })
         }
-        // If not authenticated, we stay in demo mode (no forced sign-in for sandbox exploration)
       })
-      .catch(() => {
-        // Ignore — stay in demo mode
-      })
+      .catch(() => {})
   }, [setAuth])
 
   // Sign-in view is full-screen (no sidebar)
@@ -60,6 +63,14 @@ export default function Home() {
           {view.type === 'extractions' && <Extractions />}
           {view.type === 'connectors' && <Connectors />}
           {view.type === 'settings' && <Settings />}
+          {view.type === 'buyer-intel' && <BuyerIntel />}
+          {view.type === 'buyer-detail' && <BuyerDetail organizationId={view.organizationId} />}
+          {view.type === 'award-intel' && <AwardIntel />}
+          {view.type === 'competitor-intel' && <CompetitorIntel />}
+          {view.type === 'competitor-detail' && <CompetitorDetail organizationId={view.organizationId} />}
+          {view.type === 'partner-finder' && <PartnerFinder />}
+          {view.type === 'admin' && <Admin />}
+          {view.type === 'billing' && <Billing />}
         </main>
       </div>
     </div>
