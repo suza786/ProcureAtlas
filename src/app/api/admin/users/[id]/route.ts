@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { requireTenantWithRole, logAction } from '@/lib/auth'
+import { requireTenantWithRole } from '@/lib/tenant'
+import { logAction } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
 
 // PATCH /api/admin/users/[id] — update user role or reset password (admin+ only)
