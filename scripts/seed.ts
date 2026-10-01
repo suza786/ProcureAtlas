@@ -1123,14 +1123,147 @@ async function main() {
     ],
   })
 
+  // ---------- Phase 6: Expansion Markets, i18n, SCIM, Analytics, PWA ----------
+
+  // Create expansion market configs
+  const markets = [
+    { code: 'MY', name: 'Malaysia', region: 'southeast_asia', primaryLanguage: 'ms', currency: 'MYR', portalUrl: 'https://tender.eperolehan.gov.my/', portalName: 'ePerolehan', connectorStatus: 'planned', legalStatus: 'under_review', dataResidency: 'global' },
+    { code: 'ID', name: 'Indonesia', region: 'southeast_asia', primaryLanguage: 'id', currency: 'IDR', portalUrl: 'https://lpse.LKPP.go.id/', portalName: 'LPSE LKPP', connectorStatus: 'planned', legalStatus: 'under_review', dataResidency: 'in_region' },
+    { code: 'PH', name: 'Philippines', region: 'southeast_asia', primaryLanguage: 'fil', currency: 'PHP', portalUrl: 'https://philgeps.gov.ph/', portalName: 'PhilGEPS', connectorStatus: 'planned', legalStatus: 'under_review', dataResidency: 'global' },
+    { code: 'IN', name: 'India', region: 'south_asia', primaryLanguage: 'en', currency: 'INR', portalUrl: 'https://etenders.gov.in/', portalName: 'CPPP eTender', connectorStatus: 'in_development', legalStatus: 'verified', dataResidency: 'in_region' },
+    { code: 'AU', name: 'Australia', region: 'oceania', primaryLanguage: 'en', currency: 'AUD', portalUrl: 'https://www.tenders.gov.au/', portalName: 'Austender', connectorStatus: 'planned', legalStatus: 'verified', dataResidency: 'global' },
+    { code: 'GB', name: 'United Kingdom', region: 'europe', primaryLanguage: 'en', currency: 'GBP', portalUrl: 'https://www.find-tender.service.gov.uk/', portalName: 'Find a Tender', connectorStatus: 'planned', legalStatus: 'verified', dataResidency: 'global' },
+    { code: 'CA', name: 'Canada', region: 'north_america', primaryLanguage: 'en', currency: 'CAD', portalUrl: 'https://buyandsell.gc.ca/', portalName: 'Buy and Sell', connectorStatus: 'planned', legalStatus: 'verified', dataResidency: 'global' },
+    { code: 'AE', name: 'United Arab Emirates', region: 'middle_east', primaryLanguage: 'ar', currency: 'AED', portalUrl: 'https://etenders.gov.ae/', portalName: 'UAE eTenders', connectorStatus: 'planned', legalStatus: 'under_review', dataResidency: 'in_region' },
+    { code: 'ZA', name: 'South Africa', region: 'africa', primaryLanguage: 'en', currency: 'ZAR', portalUrl: 'https://www.etenders.gov.za/', portalName: 'eTenders SA', connectorStatus: 'planned', legalStatus: 'verified', dataResidency: 'global' },
+  ]
+  for (const m of markets) {
+    await prisma.marketConfig.create({ data: { ...m, lastReviewedAt: NOW, isActive: true } })
+  }
+
+  // Create SCIM config for the demo tenant
+  await prisma.scimConfig.create({
+    data: {
+      tenantId: tenant.id,
+      provider: 'okta',
+      tenantUrl: 'https://atlas-demo.okta.com/scim/v2',
+      bearerToken: 'demo_scim_token_not_real',
+      isActive: false,
+      lastSyncAt: daysAgo(7),
+      lastSyncStatus: 'success',
+      lastSyncCount: 3,
+      userProvisioningEnabled: true,
+      userDeprovisioningEnabled: true,
+      groupSyncEnabled: false,
+    },
+  }).catch(() => {})
+
+  // Create PWA settings
+  await prisma.pwaSettings.create({
+    data: {
+      tenantId: tenant.id,
+      appName: 'ProcureAtlas AI',
+      shortName: 'ProcureAtlas',
+      themeColor: '#0f172a',
+      backgroundColor: '#f8fafc',
+      displayMode: 'standalone',
+      offlineEnabled: true,
+    },
+  }).catch(() => {})
+
+  // Create analytics snapshots for the last 6 months
+  const analyticsData = [
+    { monthsAgo: 6, activePursuits: 2, biddingPursuits: 0, submittedPursuits: 1, wonPursuits: 1, lostPursuits: 0, pipelineValueUSD: 800000, wonValueUSD: 350000, winRate: 1.0, avgBidCycleDays: 28, avgProposalWordCount: 2400, llmCallsCount: 5, llmCostUsd: 0.02, evidenceCount: 8, evidenceCoverage: 0.55 },
+    { monthsAgo: 5, activePursuits: 3, biddingPursuits: 1, submittedPursuits: 0, wonPursuits: 0, lostPursuits: 1, pipelineValueUSD: 1200000, wonValueUSD: 0, winRate: 0.0, avgBidCycleDays: 35, avgProposalWordCount: 2800, llmCallsCount: 12, llmCostUsd: 0.05, evidenceCount: 9, evidenceCoverage: 0.58 },
+    { monthsAgo: 4, activePursuits: 3, biddingPursuits: 1, submittedPursuits: 1, wonPursuits: 0, lostPursuits: 1, pipelineValueUSD: 1500000, wonValueUSD: 0, winRate: 0.0, avgBidCycleDays: 32, avgProposalWordCount: 3100, llmCallsCount: 18, llmCostUsd: 0.08, evidenceCount: 10, evidenceCoverage: 0.62 },
+    { monthsAgo: 3, activePursuits: 4, biddingPursuits: 2, submittedPursuits: 0, wonPursuits: 1, lostPursuits: 0, pipelineValueUSD: 2200000, wonValueUSD: 850000, winRate: 1.0, avgBidCycleDays: 30, avgProposalWordCount: 3300, llmCallsCount: 25, llmCostUsd: 0.12, evidenceCount: 11, evidenceCoverage: 0.65 },
+    { monthsAgo: 2, activePursuits: 4, biddingPursuits: 2, submittedPursuits: 1, wonPursuits: 0, lostPursuits: 1, pipelineValueUSD: 3500000, wonValueUSD: 0, winRate: 0.0, avgBidCycleDays: 28, avgProposalWordCount: 3400, llmCallsCount: 35, llmCostUsd: 0.18, evidenceCount: 12, evidenceCoverage: 0.67 },
+    { monthsAgo: 1, activePursuits: 4, biddingPursuits: 2, submittedPursuits: 0, wonPursuits: 0, lostPursuits: 0, pipelineValueUSD: 4870000, wonValueUSD: 0, winRate: 0.5, avgBidCycleDays: 25, avgProposalWordCount: 3420, llmCallsCount: 42, llmCostUsd: 0.25, evidenceCount: 12, evidenceCoverage: 0.67 },
+  ]
+
+  for (const snap of analyticsData) {
+    const snapshotDate = new Date(NOW.getTime() - snap.monthsAgo * 30 * DAY)
+    await prisma.analyticsSnapshot.create({
+      data: {
+        tenantId: tenant.id,
+        snapshotDate,
+        activePursuits: snap.activePursuits,
+        biddingPursuits: snap.biddingPursuits,
+        submittedPursuits: snap.submittedPursuits,
+        wonPursuits: snap.wonPursuits,
+        lostPursuits: snap.lostPursuits,
+        pipelineValueUSD: snap.pipelineValueUSD,
+        wonValueUSD: snap.wonValueUSD,
+        winRate: snap.winRate,
+        avgBidCycleDays: snap.avgBidCycleDays,
+        avgProposalWordCount: snap.avgProposalWordCount,
+        llmCallsCount: snap.llmCallsCount,
+        llmCostUsd: snap.llmCostUsd,
+        evidenceCount: snap.evidenceCount,
+        evidenceCoverage: snap.evidenceCoverage,
+      },
+    }).catch(() => {})
+  }
+
+  // Create a few tenders from expansion markets
+  const expansionTenders = [
+    { externalId: 'IN-CPPP-2026-015', sourcePortal: 'cppp_in', sourceUrl: 'https://etenders.gov.in/tender/015', title: 'Indian Railways — Cybersecurity Operations Center Setup', country: 'IN', market: 'IN', sector: 'Cyber', currency: 'INR', estimatedValue: 45000000, valueUSD: 540000, publishedAt: daysAgo(5), submissionDeadline: daysFromNow(20), buyerIdx: -1, contactPerson: 'IR Procurement', contactEmail: 'tender@indianrailways.gov.in', requirements: [{ category: 'experience', criterion: 'Minimum annual turnover', operator: '>=', threshold: '200000000 INR', isMandatory: true, sourceDoc: 'Tender Doc', sourcePage: 5, extractedText: 'Minimum annual turnover of INR 20 Crore.', confidence: 0.95 }, { category: 'certification', criterion: 'ISO 27001', operator: '==', threshold: 'Valid', isMandatory: true, sourceDoc: 'Tender Doc', sourcePage: 6, extractedText: 'ISO 27001 certification required.', confidence: 0.95 }] },
+    { externalId: 'GB-FTS-2026-088', sourcePortal: 'fts_uk', sourceUrl: 'https://find-tender.service.gov.uk/Notice/088', title: 'UK MoD — Secure Communications Infrastructure', country: 'GB', market: 'GB', sector: 'IT', currency: 'GBP', estimatedValue: 1200000, valueUSD: 1520000, publishedAt: daysAgo(3), submissionDeadline: daysFromNow(32), buyerIdx: -1, contactPerson: 'MoD Procurement', contactEmail: 'mod-procurement@gov.uk', requirements: [{ category: 'certification', criterion: 'Cyber Essentials Plus', operator: '==', threshold: 'Valid', isMandatory: true, sourceDoc: 'Tender Spec', sourcePage: 4, extractedText: 'Cyber Essentials Plus required.', confidence: 0.93 }] },
+    { externalId: 'AU-AT-2026-022', sourcePortal: 'austender_au', sourceUrl: 'https://tenders.gov.au/notice/022', title: 'Australian Tax Office — Data Analytics Platform', country: 'AU', market: 'AU', sector: 'IT', currency: 'AUD', estimatedValue: 890000, valueUSD: 580000, publishedAt: daysAgo(7), submissionDeadline: daysFromNow(25), buyerIdx: -1, contactPerson: 'ATO Digital', contactEmail: 'procurement@ato.gov.au', requirements: [] },
+    { externalId: 'MY-EP-2026-044', sourcePortal: 'eperolehan_my', sourceUrl: 'https://tender.eperolehan.gov.my/044', title: 'Malaysia MoF — Government Cloud Migration', country: 'MY', market: 'MY', sector: 'IT', currency: 'MYR', estimatedValue: 3500000, valueUSD: 740000, publishedAt: daysAgo(2), submissionDeadline: daysFromNow(28), buyerIdx: -1, contactPerson: 'MoF ICT Division', contactEmail: 'ict@mof.gov.my', requirements: [] },
+    { externalId: 'AE-ET-2026-009', sourcePortal: 'etenders_ae', sourceUrl: 'https://etenders.gov.ae/009', title: 'UAE Smart Government — AI-Powered Citizen Services Platform', country: 'AE', market: 'AE', sector: 'IT', currency: 'AED', estimatedValue: 5500000, valueUSD: 1497000, publishedAt: daysAgo(4), submissionDeadline: daysFromNow(22), buyerIdx: -1, contactPerson: 'UAE Digital Government', contactEmail: 'tenders@dgcp.gov.ae', requirements: [] },
+  ]
+
+  for (const t of expansionTenders) {
+    const created = await prisma.tender.create({
+      data: {
+        externalId: t.externalId,
+        sourcePortal: t.sourcePortal,
+        sourceUrl: t.sourceUrl,
+        title: t.title,
+        description: `Expansion market tender from ${t.country}.`,
+        country: t.country,
+        market: t.market,
+        sector: t.sector,
+        currency: t.currency,
+        estimatedValue: t.estimatedValue,
+        valueUSD: t.valueUSD,
+        publishedAt: t.publishedAt,
+        submissionDeadline: t.submissionDeadline,
+        status: 'active',
+        contactPerson: t.contactPerson,
+        contactEmail: t.contactEmail,
+        confidence: 0.9,
+      },
+    })
+    for (const r of t.requirements) {
+      await prisma.requirement.create({
+        data: {
+          tenderId: created.id,
+          category: r.category,
+          criterion: r.criterion,
+          operator: r.operator,
+          threshold: r.threshold,
+          isMandatory: r.isMandatory,
+          sourceDoc: r.sourceDoc,
+          sourcePage: r.sourcePage,
+          sourceClause: null,
+          extractedText: r.extractedText,
+          confidence: r.confidence,
+        },
+      })
+    }
+  }
+
   console.log('✅ Seed complete.')
   console.log(`   Tenant: ${tenant.id}`)
   console.log(`   Company: ${company.id}`)
-  console.log(`   Tenders: ${createdTenders.length}`)
+  console.log(`   Tenders: ${createdTenders.length + expansionTenders.length}`)
   console.log(`   Pursuits: ${activeTenders.length}`)
   console.log(`   Users: 3 (owner/manager/contributor) — password: demo1234`)
   console.log(`   Suppliers: ${allSuppliers.length} (with profiles + awards)`)
   console.log(`   Phase 4: Proposals + Approval Chains + Webhooks + Currency Rates + Cost Estimates`)
+  console.log(`   Phase 6: 9 expansion markets + SCIM config + 6 analytics snapshots + 5 expansion tenders`)
 }
 
 main()

@@ -14,24 +14,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "ProcureAtlas AI — Global Tender Intelligence & Bid Operations",
+  description: "The Intelligence and Operating System for Global Public Procurement. Discover opportunities, assess eligibility, build evidence-backed proposals, and manage bid operations.",
+  keywords: ["procurement", "tender", "bid management", "government contracts", "procurement intelligence", "Bangladesh", "World Bank", "ADB"],
+  authors: [{ name: "ProcureAtlas AI" }],
+  manifest: "/manifest.json",
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "ProcureAtlas",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "ProcureAtlas AI",
+    description: "Global Tender Intelligence & Bid Operations Platform",
+    siteName: "ProcureAtlas AI",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "ProcureAtlas AI",
+    description: "Global Tender Intelligence & Bid Operations Platform",
   },
 };
 

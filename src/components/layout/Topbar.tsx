@@ -70,8 +70,17 @@ export function Topbar() {
         <div className="flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs">
           <Globe className="h-3.5 w-3.5 text-emerald-700" />
           <span className="font-medium text-emerald-700">{marketLabel('BD')}</span>
-          <span className="text-emerald-600/70">+6 markets</span>
+          <span className="text-emerald-600/70">+15 markets</span>
         </div>
+
+        {/* Language switcher */}
+        <button
+          onClick={() => useAppStore.getState().setLocale(useAppStore.getState().locale === 'en' ? 'bn' : 'en')}
+          className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          title="Switch language"
+        >
+          <span>{useAppStore.getState().locale === 'en' ? '🇬🇧 EN' : '🇧🇩 বাং'}</span>
+        </button>
 
         <button
           onClick={goCommand}

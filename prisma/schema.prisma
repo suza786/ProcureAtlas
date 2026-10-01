@@ -1,5 +1,5 @@
 // ProcureAtlas AI — OCDS-inspired Prisma schema
-// Phase 5: Public API Marketplace, MCP Production, Embeddings, Inbound Webhooks, Data Export.
+// Phase 6: Expansion Markets, i18n, PWA, SCIM, Advanced Analytics (FINAL PHASE).
 // Dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
 // Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
 
@@ -1196,4 +1196,97 @@ model DataExport {
 
   @@index([tenantId])
   @@index([status])
+}
+
+// ============================================================
+// Phase 6: Expansion Markets, i18n, PWA, SCIM, Advanced Analytics
+// ============================================================
+
+model MarketConfig {
+  id              String   @id @default(cuid())
+  code            String   @unique // MY | ID | PH | IN | AU | GB | CA | AE | ZA | etc.
+  name            String
+  region          String   // south_asia | southeast_asia | oceania | europe | north_america | middle_east | africa
+  primaryLanguage String   // en | ms | id | fil | hi | vi | ar | fr | es
+  currency        String   // MYR | IDR | PHP | INR | AUD | GBP | CAD | AED | ZAR
+  portalUrl       String?
+  portalName      String?
+  connectorStatus String   @default("planned") // planned | in_development | beta | live | blocked
+  legalStatus     String   @default("under_review") // verified | under_review | prohibited
+  dataResidency   String   @default("global") // global | in_region
+  isActive        Boolean  @default(true)
+  lastReviewedAt  DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([region])
+  @@index([connectorStatus])
+  @@index([legalStatus])
+}
+
+model ScimConfig {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  provider        String   // okta | azure_ad | google_workspace | custom
+  tenantUrl       String?  // SCIM endpoint base URL
+  bearerToken     String?  // encrypted in prod
+  isActive        Boolean  @default(false)
+  lastSyncAt      DateTime?
+  lastSyncStatus  String?  // success | partial | failed
+  lastSyncCount   Int      @default(0)
+  userProvisioningEnabled Boolean @default(true)
+  userDeprovisioningEnabled Boolean @default(true)
+  groupSyncEnabled Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(cuid())
+  tenantId        String
+  snapshotDate    DateTime
+  // Pursuit metrics
+  activePursuits  Int      @default(0)
+  biddingPursuits Int      @default(0)
+  submittedPursuits Int    @default(0)
+  wonPursuits     Int      @default(0)
+  lostPursuits    Int      @default(0)
+  // Pipeline metrics
+  pipelineValueUSD Float   @default(0)
+  wonValueUSD     Float    @default(0)
+  // Win rate
+  winRate         Float    @default(0)
+  // Bid metrics
+  avgBidCycleDays Float    @default(0)
+  avgProposalWordCount Int @default(0)
+  // LLM metrics
+  llmCallsCount   Int      @default(0)
+  llmCostUsd      Float    @default(0)
+  // Evidence metrics
+  evidenceCount   Int      @default(0)
+  evidenceCoverage Float   @default(0)
+  createdAt       DateTime @default(now())
+
+  @@unique([tenantId, snapshotDate])
+  @@index([tenantId])
+  @@index([snapshotDate])
+}
+
+model PwaSettings {
+  id              String   @id @default(cuid())
+  tenantId        String   @unique
+  appName         String   @default("ProcureAtlas AI")
+  shortName       String   @default("ProcureAtlas")
+  themeColor      String   @default("#0f172a")
+  backgroundColor String   @default("#f8fafc")
+  displayMode     String   @default("standalone")
+  iconUrl         String?
+  offlineEnabled  Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId])
 }

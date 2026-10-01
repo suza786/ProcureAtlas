@@ -1,0 +1,171 @@
+// ProcureAtlas AI — Phase 6 i18n Translation Strings
+// Phase 6 implements a lightweight i18n system (Zustand-based) with Bangla + English.
+// next-intl is available for production; this approach keeps the sandbox simple.
+
+export type Locale = 'en' | 'bn'
+
+export const translations: Record<Locale, Record<string, string>> = {
+  en: {
+    // Sidebar
+    'nav.workspace': 'Workspace',
+    'nav.intelligence': 'Intelligence',
+    'nav.system': 'System',
+    'nav.command': 'Command Center',
+    'nav.discover': 'Discover',
+    'nav.company': 'Company Brain',
+    'nav.pursuits': 'Pursuits',
+    'nav.compliance': 'Compliance Matrix',
+    'nav.proposals': 'Proposal Studio',
+    'nav.approvals': 'Approvals',
+    'nav.extractions': 'LLM Review Queue',
+    'nav.connectors': 'Connectors',
+    'nav.audit': 'Audit Log',
+    'nav.buyerIntel': 'Buyer Intelligence',
+    'nav.awardIntel': 'Award Intelligence',
+    'nav.competitorIntel': 'Competitor Intelligence',
+    'nav.partnerFinder': 'Partner / JV Finder',
+    'nav.developer': 'Developer Portal',
+    'nav.webhooks': 'Webhooks',
+    'nav.notifications': 'Notifications',
+    'nav.financials': 'Financial Modeling',
+    'nav.admin': 'Admin Console',
+    'nav.billing': 'Billing & Usage',
+    'nav.settings': 'Settings & API Keys',
+    'nav.analytics': 'Analytics',
+    'nav.markets': 'Markets',
+
+    // Command Center
+    'cc.title': 'Command Center',
+    'cc.activeTenders': 'Active Tenders',
+    'cc.activePursuits': 'Active Pursuits',
+    'cc.pipelineValue': 'Pipeline Value',
+    'cc.winRate': 'Win Rate',
+    'cc.criticalAlerts': 'Critical Alerts',
+    'cc.deadlines7d': 'Deadlines (7d)',
+    'cc.recentAwards': 'Recent Awards',
+    'cc.deadlineTimeline': 'Deadlines — Next 7 Days',
+    'cc.activeAlerts': 'Active Alerts',
+    'cc.pipelineDist': 'Pipeline Distribution',
+    'cc.pipelineByMarket': 'Pipeline Value by Market (USD K)',
+    'cc.recentPursuits': 'Recent Pursuits',
+    'cc.acrossMarkets': 'Across markets',
+
+    // Common
+    'common.viewAll': 'View all',
+    'common.loading': 'Loading...',
+    'common.search': 'Search',
+    'common.filter': 'Filter',
+    'common.clear': 'Clear',
+    'common.export': 'Export',
+    'common.cancel': 'Cancel',
+    'common.create': 'Create',
+    'common.save': 'Save',
+    'common.delete': 'Delete',
+    'common.back': 'Back',
+    'common.days': 'days',
+    'common.estimated': 'Estimated',
+
+    // Markets
+    'markets.title': 'Expansion Markets',
+    'markets.desc': 'Global procurement market catalog with connector status, legal compliance, and data residency.',
+    'markets.connectorStatus': 'Connector',
+    'markets.legalStatus': 'Legal',
+    'markets.dataResidency': 'Data Residency',
+    'markets.language': 'Language',
+    'markets.currency': 'Currency',
+
+    // Analytics
+    'analytics.title': 'Advanced Analytics',
+    'analytics.desc': 'Tenant-level analytics dashboard with win-rate trends, pipeline velocity, and LLM usage.',
+    'analytics.winRateTrend': 'Win Rate Trend (6 months)',
+    'analytics.pipelineValue': 'Pipeline Value Trend',
+    'analytics.llmUsage': 'LLM Usage Trend',
+    'analytics.evidenceCoverage': 'Evidence Coverage Trend',
+    'analytics.bidCycleTime': 'Avg Bid Cycle Time (days)',
+    'analytics.monthly': 'Monthly Snapshot',
+  },
+
+  bn: {
+    // Sidebar
+    'nav.workspace': 'ওয়ার্কস্পেস',
+    'nav.intelligence': 'ইন্টেলিজেন্স',
+    'nav.system': 'সিস্টেম',
+    'nav.command': 'কমান্ড সেন্টার',
+    'nav.discover': 'আবিষ্কার',
+    'nav.company': 'কোম্পানি ব্রেইন',
+    'nav.pursuits': 'পারস্যুট',
+    'nav.compliance': 'কমপ্লায়েন্স ম্যাট্রিক্স',
+    'nav.proposals': 'প্রপোজাল স্টুডিও',
+    'nav.approvals': 'অনুমোদন',
+    'nav.extractions': 'এলএলএম রিভিউ কিউ',
+    'nav.connectors': 'কানেক্টর',
+    'nav.audit': 'অডিট লগ',
+    'nav.buyerIntel': 'বায়ার ইন্টেলিজেন্স',
+    'nav.awardIntel': 'অ্যাওয়ার্ড ইন্টেলিজেন্স',
+    'nav.competitorIntel': 'প্রতিযোগী ইন্টেলিজেন্স',
+    'nav.partnerFinder': 'পার্টনার / জেভি ফাইন্ডার',
+    'nav.developer': 'ডেভেলপার পোর্টাল',
+    'nav.webhooks': 'ওয়েবহুক',
+    'nav.notifications': 'নোটিফিকেশন',
+    'nav.financials': 'আর্থিক মডেলিং',
+    'nav.admin': 'অ্যাডমিন কনসোল',
+    'nav.billing': 'বিলিং ও ব্যবহার',
+    'nav.settings': 'সেটিংস ও এপিআই কী',
+    'nav.analytics': 'অ্যানালিটিক্স',
+    'nav.markets': 'বাজারসমূহ',
+
+    // Command Center
+    'cc.title': 'কমান্ড সেন্টার',
+    'cc.activeTenders': 'সক্রিয় টেন্ডার',
+    'cc.activePursuits': 'সক্রিয় পারস্যুট',
+    'cc.pipelineValue': 'পাইপলাইন মূল্য',
+    'cc.winRate': 'বিজয় হার',
+    'cc.criticalAlerts': 'জরুরি সতর্কতা',
+    'cc.deadlines7d': 'সময়সীমা (৭দিন)',
+    'cc.recentAwards': 'সাম্প্রতিক পুরস্কার',
+    'cc.deadlineTimeline': 'সময়সীমা — আগামী ৭ দিন',
+    'cc.activeAlerts': 'সক্রিয় সতর্কতা',
+    'cc.pipelineDist': 'পাইপলাইন বিতরণ',
+    'cc.pipelineByMarket': 'বাজার অনুযায়ী পাইপলাইন মূল্য (হাজার ডলার)',
+    'cc.recentPursuits': 'সাম্প্রতিক পারস্যুট',
+    'cc.acrossMarkets': 'বাজার জুড়ে',
+
+    // Common
+    'common.viewAll': 'সব দেখুন',
+    'common.loading': 'লোড হচ্ছে...',
+    'common.search': 'অনুসন্ধান',
+    'common.filter': 'ফিল্টার',
+    'common.clear': 'মুছুন',
+    'common.export': 'রপ্তানি',
+    'common.cancel': 'বাতিল',
+    'common.create': 'তৈরি করুন',
+    'common.save': 'সংরক্ষণ',
+    'common.delete': 'মুছে ফেলুন',
+    'common.back': 'পেছনে',
+    'common.days': 'দিন',
+    'common.estimated': 'আনুমানিক',
+
+    // Markets
+    'markets.title': 'সম্প্রসারণ বাজার',
+    'markets.desc': 'গ্লোবাল প্রকিউরমেন্ট মার্কেট ক্যাটালগ — কানেক্টর স্ট্যাটাস, আইনি সম্মতি, এবং ডেটা রেসিডেন্সি সহ।',
+    'markets.connectorStatus': 'কানেক্টর',
+    'markets.legalStatus': 'আইনি',
+    'markets.dataResidency': 'ডেটা রেসিডেন্সি',
+    'markets.language': 'ভাষা',
+    'markets.currency': 'মুদ্রা',
+
+    // Analytics
+    'analytics.title': 'উন্নত অ্যানালিটিক্স',
+    'analytics.desc': 'টেন্যান্ট-লেভেল অ্যানালিটিক্স ড্যাশবোর্ড — বিজয় হার প্রবণতা, পাইপলাইন বেগ, এবং এলএলএম ব্যবহার সহ।',
+    'analytics.winRateTrend': 'বিজয় হার প্রবণতা (৬ মাস)',
+    'analytics.pipelineValue': 'পাইপলাইন মূল্য প্রবণতা',
+    'analytics.llmUsage': 'এলএলএম ব্যবহার প্রবণতা',
+    'analytics.evidenceCoverage': 'প্রমাণ কভারেজ প্রবণতা',
+    'analytics.bidCycleTime': 'গড় বিড চক্র সময় (দিন)',
+    'analytics.monthly': 'মাসিক স্ন্যাপশট',
+  },
+}
+
+export function t(locale: Locale, key: string): string {
+  return translations[locale]?.[key] ?? translations.en[key] ?? key
+}

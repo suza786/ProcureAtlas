@@ -31,6 +31,8 @@ export type View =
   | { type: 'notifications' }
   | { type: 'financials' }
   | { type: 'developer' }
+  | { type: 'analytics' }
+  | { type: 'markets' }
 
 interface DiscoverFilters {
   market: string
@@ -82,6 +84,10 @@ interface AppState {
   goNotifications: () => void
   goFinancials: () => void
   goDeveloper: () => void
+  goAnalytics: () => void
+  goMarkets: () => void
+  locale: 'en' | 'bn'
+  setLocale: (locale: 'en' | 'bn') => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -122,4 +128,8 @@ export const useAppStore = create<AppState>((set) => ({
   goNotifications: () => set({ view: { type: 'notifications' } }),
   goFinancials: () => set({ view: { type: 'financials' } }),
   goDeveloper: () => set({ view: { type: 'developer' } }),
+  goAnalytics: () => set({ view: { type: 'analytics' } }),
+  goMarkets: () => set({ view: { type: 'markets' } }),
+  locale: 'en',
+  setLocale: (locale) => set({ locale }),
 }))

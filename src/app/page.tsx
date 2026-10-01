@@ -28,6 +28,8 @@ import { Webhooks } from '@/components/views/Webhooks'
 import { Notifications } from '@/components/views/Notifications'
 import { Financials } from '@/components/views/Financials'
 import { Developer } from '@/components/views/Developer'
+import { Analytics } from '@/components/views/Analytics'
+import { Markets } from '@/components/views/Markets'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
@@ -84,6 +86,8 @@ export default function Home() {
           {view.type === 'notifications' && <Notifications />}
           {view.type === 'financials' && <Financials />}
           {view.type === 'developer' && <Developer />}
+          {view.type === 'analytics' && <Analytics />}
+          {view.type === 'markets' && <Markets />}
         </main>
       </div>
     </div>

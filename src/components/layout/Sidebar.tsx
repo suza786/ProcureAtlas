@@ -22,6 +22,7 @@ import {
   Webhook,
   Calculator,
   Code2,
+  BarChart3,
 } from 'lucide-react'
 
 const navItems = [
@@ -36,6 +37,8 @@ const navItems = [
   { id: 'connectors', label: 'Connectors', icon: Globe, action: 'goConnectors' as const },
   { id: 'audit', label: 'Audit Log', icon: Shield, action: 'goAudit' as const },
   { id: 'alerts', label: 'Alerts', icon: Bell, action: 'goCommand' as const },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, action: 'goAnalytics' as const },
+  { id: 'markets', label: 'Markets', icon: Globe, action: 'goMarkets' as const },
 ] as const
 
 const intelligenceItems = [
@@ -78,8 +81,10 @@ export function Sidebar() {
   const goNotifications = useAppStore((s) => s.goNotifications)
   const goFinancials = useAppStore((s) => s.goFinancials)
   const goDeveloper = useAppStore((s) => s.goDeveloper)
+  const goAnalytics = useAppStore((s) => s.goAnalytics)
+  const goMarkets = useAppStore((s) => s.goMarkets)
 
-  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling, goProposals, goApprovals, goWebhooks, goNotifications, goFinancials, goDeveloper }
+  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling, goProposals, goApprovals, goWebhooks, goNotifications, goFinancials, goDeveloper, goAnalytics, goMarkets }
 
   const isActive = (id: string) => {
     if (id === 'command' && view.type === 'command') return true
@@ -102,6 +107,8 @@ export function Sidebar() {
     if (id === 'notifications' && view.type === 'notifications') return true
     if (id === 'financials' && view.type === 'financials') return true
     if (id === 'developer' && view.type === 'developer') return true
+    if (id === 'analytics' && view.type === 'analytics') return true
+    if (id === 'markets' && view.type === 'markets') return true
     return false
   }
 
@@ -113,7 +120,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-slate-900">ProcureAtlas</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 5</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 6</span>
         </div>
       </div>
 
