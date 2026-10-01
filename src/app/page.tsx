@@ -22,6 +22,11 @@ import { CompetitorIntel, CompetitorDetail } from '@/components/views/Competitor
 import { PartnerFinder } from '@/components/views/PartnerFinder'
 import { Admin } from '@/components/views/Admin'
 import { Billing } from '@/components/views/Billing'
+import { Proposals, ProposalEditor } from '@/components/views/Proposals'
+import { Approvals } from '@/components/views/Approvals'
+import { Webhooks } from '@/components/views/Webhooks'
+import { Notifications } from '@/components/views/Notifications'
+import { Financials } from '@/components/views/Financials'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
@@ -71,6 +76,12 @@ export default function Home() {
           {view.type === 'partner-finder' && <PartnerFinder />}
           {view.type === 'admin' && <Admin />}
           {view.type === 'billing' && <Billing />}
+          {view.type === 'proposals' && <Proposals />}
+          {view.type === 'proposal-editor' && <ProposalEditor proposalId={view.proposalId} />}
+          {view.type === 'approvals' && <Approvals />}
+          {view.type === 'webhooks' && <Webhooks />}
+          {view.type === 'notifications' && <Notifications />}
+          {view.type === 'financials' && <Financials />}
         </main>
       </div>
     </div>

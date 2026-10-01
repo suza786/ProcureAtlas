@@ -18,6 +18,15 @@ async function main() {
   console.log('🌱 Seeding ProcureAtlas AI demo data...')
 
   // Clean (order matters for FK constraints)
+  await prisma.bidCostEstimate.deleteMany()
+  await prisma.currencyRate.deleteMany()
+  await prisma.notificationPreference.deleteMany()
+  await prisma.webhookDelivery.deleteMany()
+  await prisma.webhookEndpoint.deleteMany()
+  await prisma.proposalVersion.deleteMany()
+  await prisma.proposalSection.deleteMany()
+  await prisma.proposal.deleteMany()
+  await prisma.approvalChain.deleteMany()
   await prisma.invoice.deleteMany()
   await prisma.usageMetric.deleteMany()
   await prisma.subscription.deleteMany()
@@ -703,10 +712,15 @@ async function main() {
         // Approval request
         await prisma.approval.create({
           data: {
+            tenantId: tenant.id,
             pursuitId: pursuit.id,
+            triggerType: 'submission',
+            stepOrder: 1,
             requestedBy: 'owner@atlas-demo.com',
+            approverRole: 'admin',
             decision: 'pending',
             reason: 'Bid submission authorization required before deadline.',
+            slaDueAt: daysFromNow(7),
           },
         })
       }
@@ -948,6 +962,167 @@ async function main() {
     }).catch(() => {})
   }
 
+  // ---------- Phase 4: Proposal Studio + Approvals + Webhooks + Financials ----------
+
+  // Create a sample proposal for the first bidding pursuit
+  const biddingPursuits = await prisma.pursuit.findMany({
+    where: { tenantId: tenant.id, stage: 'bidding' },
+    take: 1,
+  })
+  if (biddingPursuits.length > 0) {
+    const pursuit = biddingPursuits[0]
+    const proposal = await prisma.proposal.create({
+      data: {
+        tenantId: tenant.id,
+        pursuitId: pursuit.id,
+        title: 'Technical Proposal — SOC Platform Implementation',
+        status: 'in_review',
+        currentVersion: 2,
+        totalSections: 9,
+        completedSections: 5,
+        evidenceCoverage: 0.67,
+        wordCount: 3420,
+        lastEditedAt: daysAgo(1),
+        lastEditedBy: ownerUser.id,
+        sections: {
+          create: [
+            { sectionType: 'executive_summary', title: 'Executive Summary', order: 1, status: 'approved', wordCount: 420, evidenceCount: 3, content: 'Atlas Demo Co. is pleased to submit this proposal for the Supply, Installation & Commissioning of SOC Platform for Bangladesh Computer Council. With over 11 years of experience in cybersecurity and a proven track record with the Bangladesh Election Commission and Sonali Bank, we are uniquely positioned to deliver a world-class SOC platform. Our ISO 27001:2022 and CMMI Level 3 certifications demonstrate our commitment to quality and security.' },
+            { sectionType: 'technical_approach', title: 'Technical Approach', order: 2, status: 'in_review', wordCount: 680, evidenceCount: 2, content: 'Our technical approach leverages a defense-in-depth strategy using the Cisco Secure Network Analytics platform. The implementation follows a phased approach: (1) Infrastructure Assessment, (2) SIEM Deployment, (3) SOAR Integration, (4) 24/7 Monitoring Setup, (5) Knowledge Transfer. Our Cisco Gold Integrator authorization ensures direct vendor support throughout the engagement.' },
+            { sectionType: 'methodology', title: 'Methodology', order: 3, status: 'drafting', wordCount: 350, evidenceCount: 1, hasGaps: true, content: 'Our methodology follows ITIL v4 and ISO 27001 frameworks. [GAP: Specific BCC ITSM framework alignment needs verification.]' },
+            { sectionType: 'team', title: 'Team & Key Personnel', order: 4, status: 'approved', wordCount: 520, evidenceCount: 4, content: 'Our team is led by Anika Rahman (CISSP, CCSP) as Chief Security Architect with 14 years of experience. The network engineering team is led by Tanvir Hasan (CCIE) with 11 years of experience. Bid management is handled by Sadia Karim (APMP Practitioner).' },
+            { sectionType: 'past_performance', title: 'Past Performance', order: 5, status: 'approved', wordCount: 450, evidenceCount: 4, content: '1. National ID System Cybersecurity Hardening (Bangladesh Election Commission, $850K) — Prime contractor. 2. Sonali Bank Core Banking Firewall Upgrade ($320K) — Prime contractor. 3. BRTA Vehicle Registration Portal Security Audit ($120K) — Subcontractor. 4. A2I GovTech Innovation Lab DevSecOps ($220K) — Prime contractor.' },
+            { sectionType: 'pricing', title: 'Pricing', order: 6, status: 'todo', wordCount: 0, evidenceCount: 0, hasGaps: true },
+            { sectionType: 'compliance', title: 'Compliance Matrix', order: 7, status: 'drafting', wordCount: 200, evidenceCount: 0, hasGaps: true },
+            { sectionType: 'risk', title: 'Risk Management', order: 8, status: 'todo', wordCount: 0, evidenceCount: 0, hasGaps: true },
+            { sectionType: 'timeline', title: 'Timeline & Milestones', order: 9, status: 'in_review', wordCount: 400, evidenceCount: 1, content: 'The project will be delivered over 16 weeks: Weeks 1-2: Infrastructure Assessment. Weeks 3-6: SIEM Platform Deployment. Weeks 7-10: SOAR Integration. Weeks 11-14: 24/7 Monitoring Setup. Weeks 15-16: Knowledge Transfer & Handover.' },
+          ],
+        },
+        versions: {
+          create: [
+            { versionNumber: 1, snapshotJson: '{}', wordCount: 1800, sectionCount: 9, changeSummary: 'Initial draft', createdBy: ownerUser.id, createdAt: daysAgo(5) },
+            { versionNumber: 2, snapshotJson: '{}', wordCount: 3420, sectionCount: 9, changeSummary: 'Added technical approach + past performance sections', createdBy: ownerUser.id, createdAt: daysAgo(1) },
+          ],
+        },
+      },
+    })
+
+    // Create an approval chain for submission
+    const approvalChain = await prisma.approvalChain.create({
+      data: {
+        tenantId: tenant.id,
+        name: 'Bid Submission Approval',
+        triggerType: 'submission',
+        isActive: true,
+        slaHours: 48,
+        stepsJson: JSON.stringify([
+          { order: 1, role: 'manager', approverEmail: 'manager@atlas-demo.com' },
+          { order: 2, role: 'admin', approverEmail: 'owner@atlas-demo.com' },
+        ]),
+        stepCount: 2,
+      },
+    })
+
+    // Create a pending approval linked to the proposal
+    await prisma.approval.create({
+      data: {
+        tenantId: tenant.id,
+        pursuitId: pursuit.id,
+        proposalId: proposal.id,
+        chainId: approvalChain.id,
+        triggerType: 'submission',
+        stepOrder: 1,
+        requestedBy: 'manager@atlas-demo.com',
+        approverRole: 'admin',
+        decision: 'pending',
+        reason: 'Proposal submission requires admin approval before deadline.',
+        slaDueAt: daysFromNow(3),
+      },
+    })
+
+    // Create a bid cost estimate
+    await prisma.bidCostEstimate.create({
+      data: {
+        tenantId: tenant.id,
+        pursuitId: pursuit.id,
+        label: 'Base estimate',
+        currency: 'USD',
+        laborCost: 180000,
+        materialsCost: 320000,
+        subcontractorCost: 50000,
+        overheadCost: 45000,
+        travelCost: 15000,
+        contingencyPct: 10,
+        totalCost: 670500,
+        marginPct: 18,
+        proposedPrice: 791190,
+        profitAmount: 120690,
+        hedgingNotes: '50% of materials cost in BDT. Hedge via 90-day forward contract at 110 BDT/USD.',
+        createdBy: ownerUser.id,
+      },
+    })
+  }
+
+  // Create approval chains
+  await prisma.approvalChain.createMany({
+    data: [
+      { tenantId: tenant.id, name: 'Bid / No-Bid Decision', triggerType: 'bid_decision', isActive: true, slaHours: 72, stepsJson: JSON.stringify([{ order: 1, role: 'manager' }, { order: 2, role: 'admin' }]), stepCount: 2 },
+      { tenantId: tenant.id, name: 'Pricing Approval', triggerType: 'pricing', isActive: true, slaHours: 24, stepsJson: JSON.stringify([{ order: 1, role: 'manager' }]), stepCount: 1 },
+      { tenantId: tenant.id, name: 'Legal Sign-off', triggerType: 'legal', isActive: false, slaHours: 96, stepsJson: JSON.stringify([{ order: 1, role: 'admin' }]), stepCount: 1 },
+    ],
+  })
+
+  // Create webhook endpoints
+  await prisma.webhookEndpoint.createMany({
+    data: [
+      { tenantId: tenant.id, name: 'Slack Notifications', url: 'https://hooks.slack.com/services/demo', secret: 'whsec_demo_slack_secret_key_for_testing_123456', events: 'tender.published tender.amended award.published pursuit.stage_changed', isActive: true, lastTriggeredAt: daysAgo(1), lastResponseCode: 200, lastSuccessAt: daysAgo(1), consecutiveFailures: 0 },
+      { tenantId: tenant.id, name: 'Zapier Integration', url: 'https://hooks.zapier.com/hooks/catch/demo', secret: 'whsec_demo_zapier_secret_key_for_testing_789012', events: 'approval.requested proposal.submitted', isActive: true, lastTriggeredAt: daysAgo(3), lastResponseCode: 200, lastSuccessAt: daysAgo(3), consecutiveFailures: 0 },
+      { tenantId: tenant.id, name: 'Internal API (disabled)', url: 'https://internal.example.com/webhooks/procureatlas', secret: 'whsec_demo_internal_secret_key_for_testing_345678', events: 'tender.published evidence.expiring', isActive: false, consecutiveFailures: 3 },
+    ],
+  })
+
+  // Create webhook delivery records
+  const webhooks = await prisma.webhookEndpoint.findMany({ where: { tenantId: tenant.id } })
+  if (webhooks.length > 0) {
+    await prisma.webhookDelivery.createMany({
+      data: [
+        { tenantId: tenant.id, endpointId: webhooks[0].id, eventType: 'tender.published', payloadJson: JSON.stringify({ event: 'tender.published', tenderId: 'demo', title: 'New SOC tender' }), signature: 'sha256=demo_sig_1', status: 'delivered', attemptCount: 1, responseCode: 200, deliveredAt: daysAgo(1) },
+        { tenantId: tenant.id, endpointId: webhooks[0].id, eventType: 'tender.amended', payloadJson: JSON.stringify({ event: 'tender.amended', tenderId: 'demo' }), signature: 'sha256=demo_sig_2', status: 'delivered', attemptCount: 1, responseCode: 200, deliveredAt: daysAgo(2) },
+        { tenantId: tenant.id, endpointId: webhooks[0].id, eventType: 'award.published', payloadJson: JSON.stringify({ event: 'award.published' }), signature: 'sha256=demo_sig_3', status: 'delivered', attemptCount: 1, responseCode: 200, deliveredAt: daysAgo(3) },
+        { tenantId: tenant.id, endpointId: webhooks[1]?.id ?? webhooks[0].id, eventType: 'approval.requested', payloadJson: JSON.stringify({ event: 'approval.requested' }), signature: 'sha256=demo_sig_4', status: 'delivered', attemptCount: 1, responseCode: 200, deliveredAt: daysAgo(2) },
+        { tenantId: tenant.id, endpointId: webhooks[2]?.id ?? webhooks[0].id, eventType: 'evidence.expiring', payloadJson: JSON.stringify({ event: 'evidence.expiring' }), signature: 'sha256=demo_sig_5', status: 'failed', attemptCount: 3, nextRetryAt: daysFromNow(1), errorMessage: 'Connection timeout' },
+      ],
+    })
+  }
+
+  // Create notification preferences for owner
+  const channels = ['in_app', 'email']
+  const eventTypes = ['alert', 'deadline', 'amendment', 'extraction_ready', 'approval_request', 'system']
+  for (const channel of channels) {
+    for (const eventType of eventTypes) {
+      await prisma.notificationPreference.create({
+        data: {
+          tenantId: tenant.id,
+          userId: ownerUser.id,
+          channel,
+          eventType,
+          enabled: true,
+          minSeverity: eventType === 'deadline' || eventType === 'approval_request' ? 'medium' : 'low',
+        },
+      }).catch(() => {})
+    }
+  }
+
+  // Create currency rates
+  await prisma.currencyRate.createMany({
+    data: [
+      { tenantId: tenant.id, baseCurrency: 'USD', quoteCurrency: 'BDT', rate: 110.5, source: 'manual', rateDate: daysAgo(1) },
+      { tenantId: tenant.id, baseCurrency: 'USD', quoteCurrency: 'SGD', rate: 1.34, source: 'manual', rateDate: daysAgo(1) },
+      { tenantId: tenant.id, baseCurrency: 'USD', quoteCurrency: 'EUR', rate: 0.92, source: 'ecb', rateDate: daysAgo(1) },
+      { tenantId: tenant.id, baseCurrency: 'USD', quoteCurrency: 'GBP', rate: 0.79, source: 'ecb', rateDate: daysAgo(1) },
+      { tenantId: tenant.id, baseCurrency: 'USD', quoteCurrency: 'INR', rate: 83.2, source: 'manual', rateDate: daysAgo(1) },
+    ],
+  })
+
   console.log('✅ Seed complete.')
   console.log(`   Tenant: ${tenant.id}`)
   console.log(`   Company: ${company.id}`)
@@ -955,6 +1130,7 @@ async function main() {
   console.log(`   Pursuits: ${activeTenders.length}`)
   console.log(`   Users: 3 (owner/manager/contributor) — password: demo1234`)
   console.log(`   Suppliers: ${allSuppliers.length} (with profiles + awards)`)
+  console.log(`   Phase 4: Proposals + Approval Chains + Webhooks + Currency Rates + Cost Estimates`)
 }
 
 main()

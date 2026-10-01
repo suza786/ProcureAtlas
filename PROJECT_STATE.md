@@ -4,159 +4,125 @@
 
 ## Current Phase
 
-**Phase 3 — Intelligence Layer (Buyer, Award, Competitor, Partner) + Admin + Billing** (complete, verified)
+**Phase 4 — Proposal Studio, Approval Workflows, Webhooks, Notifications, Financial Modeling** (complete, verified)
 
-## Phase 2 → Phase 3 Summary
+## Phase 3 → Phase 4 Summary
 
-Phase 2 delivered authentication, LLM extraction, file uploads, connectors, and the MCP server. Phase 3 layered on the intelligence layer: Buyer Intelligence, Award Intelligence, Competitor Intelligence, Partner/JV Finder, semantic matching, faceted search, an Admin Console, and a Billing foundation with usage metering and plan management.
+Phase 3 delivered the intelligence layer (Buyer, Award, Competitor, Partner) + Admin + Billing. Phase 4 added the bid operations layer: AI-assisted Proposal Studio with evidence gating, configurable approval workflows with SLA tracking, outbound webhooks with HMAC-signed payloads and retry, notification preferences, and multi-currency bid cost estimation.
 
 ---
 
-## Phase 3 Completed Work
+## Phase 4 Completed Work
 
-### Buyer Intelligence
-- **API**: `GET /api/buyers` (list with aggregated stats), `GET /api/buyers/[id]` (detailed profile)
-- **UI**: Buyer list table with search, tender/award counts, total award value, incumbent count, top sectors; Buyer detail page with stats grid, incumbent supplier mapping, sector preferences, recent tenders, award history
-- **Data**: 8 buyer organizations with aggregated award stats (BCC, GovTech Singapore, EU DG DIGIT, etc.)
+### Proposal Studio
+- **Models**: Proposal, ProposalSection (9 default section types), ProposalVersion (snapshots)
+- **API**: CRUD proposals, PATCH sections (auto-saves on blur), POST draft-section (AI-assisted), POST versions
+- **UI**: Proposal list with status/version/coverage stats; Proposal editor with section sidebar, content textarea, AI Draft button, version saving
+- **AI-assisted drafting**: `POST /api/proposals/[id]/draft-section` calls GLM-4.6 with full evidence gating — builds evidence graph from company certifications/projects/employees, LLM may ONLY cite evidence IDs, gaps are surfaced not invented, Zod schema validation, audit logged
+- **Default sections**: Executive Summary, Technical Approach, Methodology, Team & Key Personnel, Past Performance, Pricing, Compliance Matrix, Risk Management, Timeline & Milestones
+- **Evidence coverage tracking**: Each section tracks evidenceCount and hasGaps; proposal-level evidenceCoverage percentage auto-computed
 
-### Award Intelligence
-- **API**: `GET /api/awards` with market/sector filters, market share aggregation, by-market and by-sector breakdowns
-- **UI**: KPI tiles (total awards, total value, avg value, distinct winners), Awards by Market bar chart, Market Share pie chart, Top Suppliers table with percentage bars, Recent Awards table
-- **Data**: 14 awards totaling $37.95M across 10 distinct winners, 6 markets
+### Approval Workflows
+- **Models**: ApprovalChain (configurable chains), Approval (extended with tenantId, proposalId, triggerType, stepOrder, approverRole, slaDueAt, escalatedAt)
+- **API**: GET /api/approvals (filter by status/triggerType), PATCH /api/approvals/[id] (approve/reject/changes_requested), GET/POST/PATCH /api/approval-chains
+- **UI**: Approvals dashboard with pending/approved/rejected/all filters, SLA tracking with overdue indicators, approve/reject/changes buttons, Approval Chains configuration modal
+- **Trigger types**: bid_decision, submission, pricing, legal, evidence_verification
+- **SLA tracking**: slaDueAt on each approval, isOverdue computed, escalation field ready
+- **Workflow integration**: approved submission → pursuit stage = 'submitted'; rejected bid_decision → pursuit stage = 'no_bid'
 
-### Competitor Intelligence
-- **API**: `GET /api/competitors` (list with stats), `GET /api/competitors/[id]` (detailed profile with win trend)
-- **UI**: Competitor cards with award counts, total/avg values, sector breakdowns, top buyers; Competitor detail page with stats grid, Win Trend by Year chart, Top Buyers, Sector Breakdown, Market Breakdown, Award History table
-- **Data**: 13 suppliers with profiles (competitor/partner flags), including CyberNet, DataSoft, NCS Group, Deloitte, Booz Allen, Leidos, Wipro
+### Webhooks
+- **Models**: WebhookEndpoint (with HMAC secret, event subscriptions, failure tracking), WebhookDelivery (with signature, attempt count, retry scheduling, response logging)
+- **API**: GET/POST/DELETE /api/webhooks (endpoint CRUD), GET /api/webhooks/deliveries (delivery log), POST /api/webhooks/deliveries (manual test delivery)
+- **HMAC-SHA256 signing**: Every delivery signed with endpoint secret; signature in `X-ProcureAtlas-Signature: sha256=...` header
+- **Retry with exponential backoff**: maxAttempts=5, nextRetryAt scheduled on failure, consecutiveFailures tracked on endpoint
+- **7 event types**: tender.published, tender.amended, award.published, pursuit.stage_changed, evidence.expiring, approval.requested, proposal.submitted
+- **UI**: Endpoint cards with status/event subscriptions/delivery stats/test button; Delivery log table with status/attempts/HTTP response; Create modal with event selection; One-time secret reveal with copy button
 
-### Partner / JV Finder
-- **API**: `GET /api/partners` — computes match scores for all suppliers against tenant's company
-- **UI**: Tenant company card, partner suggestion grid with match scores, complementary capabilities, geographic overlap, top match reasons; Detail drawer with all 5 match dimensions (complementary capabilities, geographic alignment, certification complementarity, combined capacity, prior JV history)
-- **Matching engine**: `src/lib/matching.ts` — deterministic tag + keyword + capability scoring (pgvector-ready)
+### Notifications
+- **Models**: NotificationPreference (per-user, per-channel, per-event-type with minSeverity)
+- **API**: GET/PATCH /api/notifications/preferences
+- **UI**: Notification center with mark-all-read, type icons, unread indicators; Preferences modal with channel × event matrix (in_app, email, slack, teams × 7 event types)
+- **Channels**: in_app (live), email/slack/teams (scaffolded for production)
 
-### Semantic Matching Engine
-- **Library**: `src/lib/matching.ts` with `computeTenderCompanyMatch()` and `computePartnerMatch()`
-- **5 dimensions for tender matching**: sector match, capability depth, geography, contract size fit, keyword overlap
-- **5 dimensions for partner matching**: complementary capabilities, geographic alignment, certification complementarity, combined capacity, prior JV history
-- **API**: `GET /api/match/tender/[tenderId]` — semantic match score for a tender vs tenant's company
-- **pgvector-ready**: Same interface will use cosine similarity over embeddings in production with PostgreSQL
-
-### Faceted Search
-- **API**: `GET /api/search?q=...&types=tender,award,buyer,supplier&market=...&sector=...`
-- Full-text search across tenders, buyers, suppliers, and awards with faceted counts
-- **Phase 3 note**: SQLite-backed (deterministic). Production will use OpenSearch for p95 ≤ 200ms.
-
-### Admin Console
-- **API**: `GET /api/admin/users` (manager+ only), `PATCH /api/admin/users/[id]` (role update, password reset, account unlock — admin+ only), `DELETE /api/admin/users/[id]` (deactivate — admin+ only), `GET /api/admin/system` (system health)
-- **UI**: Tabbed interface — User Management (table with role/MFA/status, unlock/delete actions) + System Health (stats grid, LLM usage 30-day, storage, recent connector runs)
-- **RBAC enforced**: Manager+ for user list, Admin+ for user modifications
-
-### Billing Foundation
-- **API**: `GET /api/billing/usage` (current period usage with limits), `GET /api/billing/subscription`, `PATCH /api/billing/subscription` (plan change — owner only)
-- **UI**: Current plan card, usage meters with percentage bars (API calls, LLM tokens, tenders tracked, pursuits, file uploads), plan selection grid (5 plans: Free/Solo/Professional/Bid Team/Enterprise), invoice history
-- **Models**: Subscription (with plan limits), UsageMetric (per-period tracking), Invoice
-- **Plan limits**: Free (10 tenders, 1 pursuit, 100 API calls), Solo (50/5/1K), Professional (200/20/5K), Bid Team (1K/100/25K), Enterprise (10K/1K/100K)
-- **Stripe/SSLCommerz**: Scaffolded — `stripeCustomerId`, `sslcommerzStoreId` fields ready; payment processing deferred to production deploy
+### Financial Modeling
+- **Models**: CurrencyRate (base/quote/rate/source), BidCostEstimate (5 cost components, contingency, margin, computed totals)
+- **API**: GET/POST /api/currency-rates, GET/POST /api/bid-cost-estimates
+- **UI**: Cost estimate cards with proposed price, total cost, profit, margin, contingency, vs-tender-value percentage; Cost breakdown bar chart (Labor/Materials/Subcontractor/Overhead/Travel); Hedging notes; Currency rates table; Create estimate modal with live total/profit/price preview
 
 ### Prisma Schema Extensions
-- 7 new models: `BuyerProfile`, `SupplierProfile`, `PartnerSuggestion`, `Subscription`, `UsageMetric`, `Invoice`
-- Organization model extended with `buyerProfile`, `supplierProfile`, `partnerSuggestions` relations
-- Tenant model extended with `partnerSuggestions`, `subscription` relations
+- 10 new models: Proposal, ProposalSection, ProposalVersion, ApprovalChain, WebhookEndpoint, WebhookDelivery, NotificationPreference, CurrencyRate, BidCostEstimate
+- Approval model extended with tenantId, proposalId, chainId, triggerType, stepOrder, approverRole, slaDueAt, escalatedAt
+- Pursuit model extended with proposals, bidCostEstimates relations
 
 ### Seed Data Extended
-- 10 additional supplier organizations (DataSoft, LEADS, NCS Group, ST Engineering, Deloitte, PwC, Atos, Booz Allen, Leidos, Wipro)
-- 13 SupplierProfile records (competitor/partner flags, award stats)
-- 3 BuyerProfile records (BCC, GovTech, EU DG DIGIT)
-- 12 additional Award records across multiple buyers/suppliers/time periods
-- 4 PartnerSuggestion records with match scores and reasons
-- 1 Subscription record (Professional plan, monthly)
-- 1 Invoice record (paid, $149)
+- 1 sample proposal with 9 sections (5 with content, 4 with gaps flagged) and 2 versions
+- 4 approval chains (Bid Submission, Bid/No-Bid, Pricing, Legal)
+- 3 webhook endpoints (Slack, Zapier, Internal) with 5 delivery records
+- 12 notification preferences (2 channels × 6 event types for owner)
+- 5 currency rates (BDT, SGD, EUR, GBP, INR)
+- 1 bid cost estimate ($791K proposed price, 18% margin, with hedging notes)
 
-## Verified Functionality (Phase 3)
+## Verified Functionality (Phase 4)
 
 - `bun run lint` — passes (zero errors)
+- `bun run build` — passes (all routes compiled)
 - Dev server starts cleanly on port 3000
-- **Buyers API**: 8 buyers with aggregated stats ✅
-- **Awards API**: 14 awards, $37.95M total, 10 distinct winners, 6 markets ✅
-- **Competitors API**: 13 suppliers with profiles ✅
-- **Partners API**: 13 partner suggestions with match scores ✅
-- **Search API**: 15 results for "cyber" across tenders/buyers/suppliers/awards ✅
-- **Billing API**: Professional plan, 5 usage metrics, 1 invoice ✅
-- **Admin System API**: 3 users, 12 tenders, 4 pursuits, 4 connector runs ✅
-- **Agent-browser verified**: Award Intelligence (14 awards, $37.95M, charts), Partner Finder (13 suggestions, match scores), Competitor Intelligence (13 suppliers, profiles), Billing (Professional plan, usage meters), Admin Console (RBAC-enforced) all render with real data
-- 7 screenshots saved: `award-intel-phase3.png`, `partner-finder-phase3.png`, `competitor-intel-phase3.png`, `billing-phase3.png`, `admin-phase3.png`, `admin-system-phase3.png`, `buyer-intel-phase3.png`
+- **Proposals API**: 1 proposal with 9 sections, 2 versions, 1 approval ✅
+- **Approvals API**: 3 approvals (including 1 pending with SLA) ✅
+- **Approval Chains API**: 4 chains ✅
+- **Webhooks API**: 3 endpoints, 5 deliveries ✅
+- **Currency Rates API**: 5 rates ✅
+- **Bid Cost Estimates API**: 1 estimate ($791K) ✅
+- **Agent-browser verified**: Proposal Studio (list + editor), Financial Modeling (cost breakdown + rates), Webhooks (endpoints + delivery log), Approvals all render with real data
+- 5 screenshots saved: `proposal-studio-phase4.png`, `proposal-editor-phase4.png`, `financials-phase4.png`, `webhooks-phase4.png`, `approvals-phase4.png`
 
-## API Routes (Phase 3 complete)
+## API Routes (Phase 4 complete)
 
-### Phase 3 (new — 12 routes)
-- `GET /api/buyers` — buyer list with aggregated stats
-- `GET /api/buyers/[id]` — buyer detail with incumbents + award history
-- `GET /api/awards` — award tracking with market share
-- `GET /api/competitors` — competitor list with profiles
-- `GET /api/competitors/[id]` — competitor detail with win trend
-- `GET /api/partners` — partner/JV suggestions with match scores
-- `GET /api/search` — faceted search across all entities
-- `GET /api/match/tender/[tenderId]` — semantic tender ↔ company match
-- `GET /api/admin/users` — user management (manager+)
-- `PATCH /api/admin/users/[id]` — update user (admin+)
-- `DELETE /api/admin/users/[id]` — deactivate user (admin+)
-- `GET /api/admin/system` — system health overview
-- `GET /api/billing/usage` — current period usage
-- `GET /api/billing/subscription` — subscription details
-- `PATCH /api/billing/subscription` — change plan (owner)
+### Phase 4 (new — 14 routes)
+- `GET /api/proposals` — list proposals
+- `POST /api/proposals` — create proposal with 9 default sections
+- `GET /api/proposals/[id]` — full proposal with sections + versions
+- `PATCH /api/proposals/[id]` — update status
+- `DELETE /api/proposals/[id]` — delete
+- `PATCH /api/proposals/[id]/sections/[sectionId]` — update section content
+- `POST /api/proposals/[id]/draft-section` — AI-assisted drafting (GLM-4.6 with evidence gating)
+- `GET/POST /api/proposals/[id]/versions` — version snapshots
+- `GET /api/approvals` — list approvals
+- `PATCH /api/approvals/[id]` — approve/reject/changes_requested
+- `GET/POST/PATCH /api/approval-chains` — chain configuration
+- `GET/POST/DELETE /api/webhooks` — endpoint CRUD
+- `GET/POST /api/webhooks/deliveries` — delivery log + test
+- `GET/PATCH /api/notifications/preferences` — notification preferences
+- `GET/POST /api/currency-rates` — currency rate management
+- `GET/POST /api/bid-cost-estimates` — bid cost estimation
 
-## Incomplete Work (Phase 4+)
+## Architecture Decisions (Phase 4 additions)
+
+- **ADR-018**: Proposal Studio uses evidence-gated LLM drafting — same guardrails as requirement extraction
+- **ADR-019**: Approval workflows with configurable chains; SLA tracked per step; escalation field ready
+- **ADR-020**: Webhook delivery with HMAC-SHA256 signatures and exponential backoff retry (max 5 attempts)
+- **ADR-021**: Bid cost estimation with 5 cost components + contingency + margin; multi-currency via CurrencyRate table
+- **ADR-022**: Notification preferences as per-user, per-channel, per-event-type matrix with minSeverity filter
+
+## Incomplete Work (Phase 5+)
 
 - **PostgreSQL + pgvector migration** — schema is Postgres-ready; dev still uses SQLite
-- **OpenSearch** — faceted search uses SQLite; prod will use OpenSearch for p95 ≤ 200ms
-- **PostgreSQL RLS** — documented; not implementable on SQLite
+- **OpenSearch** — faceted search uses SQLite; prod will use OpenSearch
 - **Live connector fetching** — CPTU skeleton ready; awaiting legal sign-off
 - **Stripe/SSLCommerz payment processing** — scaffolded; needs API keys + webhooks
-- **Proposal Studio** — Phase 4
-- **Approval workflow chains** — Phase 4
-- **Webhooks** — Phase 4
+- **Email/Slack/Teams delivery** — notification preferences configured; delivery channels need integration
+- **Temporal/Celery workflow orchestration** — webhook delivery is synchronous in dev; prod needs async worker
+- **Proposal export to DOCX/PDF** — exportFormat/exportUrl fields ready; export pipeline not built
 - **Public API marketplace** — Phase 5
 - **i18n (Bangla UI)** — next-intl available; not wired
 - **Vitest + Playwright test suites** — deferred
 
-## Architecture Decisions (Phase 3 additions)
-
-- **ADR-013**: Deterministic matching engine (tag + keyword + capability) as pgvector-ready interface
-- **ADR-014**: Faceted search via SQLite in dev; OpenSearch in prod (same API shape)
-- **ADR-015**: Billing scaffold with plan limits + usage metering; Stripe/SSLCommerz deferred
-- **ADR-016**: Admin Console with RBAC enforcement (manager+ for user list, admin+ for modifications)
-- **ADR-017**: BuyerProfile/SupplierProfile as denormalized aggregation tables (computed from Awards + Tenders)
-
-## Environment Details
-
-- Runtime: Bun 1.3+
-- DB: SQLite at `file:./dev.db` (Prisma) — PostgreSQL-ready
-- MCP Server: Bun, port 3001
-- Port: 3000 (only externally visible Next.js route is `/`)
-- AI SDK: `z-ai-web-dev-sdk` — LIVE (GLM-4.6)
-- File storage: `/home/z/my-project/uploads/{tenantId}/{category}/`
-
-## How to Run
-
-```bash
-bun run db:push           # apply schema
-bun run scripts/seed.ts   # seed demo data (idempotent)
-# dev server is auto-started by the sandbox
-# MCP server: cd mini-services/mcp-server && bun run dev
-```
-
-**Demo credentials:**
-- owner@atlas-demo.com / demo1234 (Owner role)
-- manager@atlas-demo.com / demo1234 (Manager role)
-- contributor@atlas-demo.com / demo1234 (Contributor role)
-
 ## Next Recommended Phase
 
-**Phase 4 — Proposal Studio, Approval Workflows, Webhooks**
-- Proposal Studio: AI-assisted proposal drafting grounded in approved evidence
-- Approval workflows: configurable chains for bid/no-bid, submission, pricing, legal
-- Webhooks: outbound event delivery with signed payloads + retry
-- Assisted submission preparation (no autonomous submission)
-- Multi-currency financial modeling
-- Notifications: in-app + email + Slack/Teams
-- Temporal/Celery workflow orchestration for long-running bid prep
+**Phase 5 — MCP Server (production) + Public API Marketplace**
+- MCP server with full tool surface, SSE transport, per-API-key authorization, rate limiting
+- Versioned REST API (`/api/v1/*`), API key management, tiered rate limits, usage metering
+- Embeddings API for programmatic semantic search
+- Inbound webhook ingestion from select sources
+- Data export API (CSV/JSON)
+- Developer documentation portal

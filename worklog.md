@@ -94,6 +94,32 @@ Stage Summary:
 - Lint passes; 7 screenshots saved documenting Phase 3 features
 
 ---
+Task ID: 4
+Agent: main
+Task: Phase 4 — Proposal Studio, Approval Workflows, Webhooks, Notifications, Financial Modeling
+
+Work Log:
+- Extended Prisma schema with 10 new models: Proposal, ProposalSection, ProposalVersion, ApprovalChain, WebhookEndpoint, WebhookDelivery, NotificationPreference, CurrencyRate, BidCostEstimate; extended Approval model with tenantId, proposalId, triggerType, stepOrder, slaDueAt; extended Pursuit with proposals + bidCostEstimates relations
+- Built Proposal Studio: API (CRUD proposals, sections, versions) + UI with proposal list, editor with section sidebar, content textarea, AI Draft button, version snapshots
+- Built AI-assisted proposal drafting endpoint (POST /api/proposals/[id]/draft-section) using GLM-4.6 with full evidence gating — builds evidence graph from company certs/projects/employees, LLM may only cite evidence IDs, gaps are surfaced not invented, Zod schema validation, audit logged
+- Built Approval Workflows: API (GET/PATCH /api/approvals, GET/POST/PATCH /api/approval-chains) + UI with pending/approved/rejected filters, SLA tracking with overdue indicators, approve/reject buttons, chain configuration modal
+- Built Webhooks system: API (endpoint CRUD, delivery log, manual test) + UI with endpoint cards, delivery log table, create modal with event selection, one-time secret reveal; HMAC-SHA256 signing, retry with exponential backoff
+- Built Notifications: API (GET/PATCH preferences) + UI with notification center (mark-all-read, type icons, unread indicators) and preferences modal (channel × event matrix)
+- Built Financial Modeling: API (currency rates, bid cost estimates) + UI with cost estimate cards (proposed price, cost breakdown bar chart, profit/margin, hedging notes), currency rates table, create estimate modal with live preview
+- Updated Sidebar with Proposal Studio, Approvals in Workspace section; Webhooks, Notifications, Financial Modeling in System section
+- Updated store with 6 new view types; wired all new views into page.tsx
+- Extended seed script with sample proposal (9 sections, 2 versions), 4 approval chains, 3 webhook endpoints with 5 deliveries, 12 notification preferences, 5 currency rates, 1 bid cost estimate
+- Updated sidebar label to "Phase 4"
+- Verified build passes (fixes deployment issue from Phase 3)
+
+Stage Summary:
+- Phase 4 complete and verified: Proposal Studio (AI-assisted, evidence-gated), Approval Workflows (SLA-tracked), Webhooks (HMAC-signed, retry), Notifications (preferences matrix), Financial Modeling (multi-currency cost estimation)
+- 16 new API routes added (total 57 across Phases 1-4)
+- 10 new Prisma models (total 42 across all phases)
+- All APIs verified with real data; build passes; agent-browser verified 5 new views
+- 5 screenshots saved documenting Phase 4 features
+
+---
 Task ID: 1-docs
 Agent: general-purpose (docs sub-agent)
 Task: Write ProcureAtlas documentation suite (20 files under /docs)

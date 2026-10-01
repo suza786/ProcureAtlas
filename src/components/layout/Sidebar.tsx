@@ -18,6 +18,9 @@ import {
   Building2,
   Handshake,
   CreditCard,
+  FileText,
+  Webhook,
+  Calculator,
 } from 'lucide-react'
 
 const navItems = [
@@ -26,6 +29,8 @@ const navItems = [
   { id: 'company', label: 'Company Brain', icon: Brain, action: 'goCompany' as const },
   { id: 'pursuits', label: 'Pursuits', icon: Target, action: 'goPursuits' as const },
   { id: 'compliance', label: 'Compliance Matrix', icon: FileCheck2, action: 'goPursuits' as const },
+  { id: 'proposals', label: 'Proposal Studio', icon: FileText, action: 'goProposals' as const },
+  { id: 'approvals', label: 'Approvals', icon: Shield, action: 'goApprovals' as const },
   { id: 'extractions', label: 'LLM Review Queue', icon: Cpu, action: 'goExtractions' as const },
   { id: 'connectors', label: 'Connectors', icon: Globe, action: 'goConnectors' as const },
   { id: 'audit', label: 'Audit Log', icon: Shield, action: 'goAudit' as const },
@@ -40,6 +45,9 @@ const intelligenceItems = [
 ] as const
 
 const systemItems = [
+  { id: 'webhooks', label: 'Webhooks', icon: Webhook, action: 'goWebhooks' as const },
+  { id: 'notifications', label: 'Notifications', icon: Bell, action: 'goNotifications' as const },
+  { id: 'financials', label: 'Financial Modeling', icon: Calculator, action: 'goFinancials' as const },
   { id: 'admin', label: 'Admin Console', icon: Shield, action: 'goAdmin' as const },
   { id: 'billing', label: 'Billing & Usage', icon: CreditCard, action: 'goBilling' as const },
   { id: 'settings', label: 'Settings & API Keys', icon: Settings, action: 'goSettings' as const },
@@ -62,8 +70,13 @@ export function Sidebar() {
   const goPartnerFinder = useAppStore((s) => s.goPartnerFinder)
   const goAdmin = useAppStore((s) => s.goAdmin)
   const goBilling = useAppStore((s) => s.goBilling)
+  const goProposals = useAppStore((s) => s.goProposals)
+  const goApprovals = useAppStore((s) => s.goApprovals)
+  const goWebhooks = useAppStore((s) => s.goWebhooks)
+  const goNotifications = useAppStore((s) => s.goNotifications)
+  const goFinancials = useAppStore((s) => s.goFinancials)
 
-  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling }
+  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling, goProposals, goApprovals, goWebhooks, goNotifications, goFinancials }
 
   const isActive = (id: string) => {
     if (id === 'command' && view.type === 'command') return true
@@ -80,6 +93,11 @@ export function Sidebar() {
     if (id === 'admin' && view.type === 'admin') return true
     if (id === 'billing' && view.type === 'billing') return true
     if (id === 'settings' && view.type === 'settings') return true
+    if (id === 'proposals' && (view.type === 'proposals' || view.type === 'proposal-editor')) return true
+    if (id === 'approvals' && view.type === 'approvals') return true
+    if (id === 'webhooks' && view.type === 'webhooks') return true
+    if (id === 'notifications' && view.type === 'notifications') return true
+    if (id === 'financials' && view.type === 'financials') return true
     return false
   }
 
@@ -91,7 +109,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-slate-900">ProcureAtlas</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 3</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 4</span>
         </div>
       </div>
 

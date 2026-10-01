@@ -24,6 +24,12 @@ export type View =
   | { type: 'partner-finder' }
   | { type: 'admin' }
   | { type: 'billing' }
+  | { type: 'proposals' }
+  | { type: 'proposal-editor'; proposalId: string }
+  | { type: 'approvals' }
+  | { type: 'webhooks' }
+  | { type: 'notifications' }
+  | { type: 'financials' }
 
 interface DiscoverFilters {
   market: string
@@ -68,6 +74,12 @@ interface AppState {
   goPartnerFinder: () => void
   goAdmin: () => void
   goBilling: () => void
+  goProposals: () => void
+  openProposalEditor: (proposalId: string) => void
+  goApprovals: () => void
+  goWebhooks: () => void
+  goNotifications: () => void
+  goFinancials: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -101,4 +113,10 @@ export const useAppStore = create<AppState>((set) => ({
   goPartnerFinder: () => set({ view: { type: 'partner-finder' } }),
   goAdmin: () => set({ view: { type: 'admin' } }),
   goBilling: () => set({ view: { type: 'billing' } }),
+  goProposals: () => set({ view: { type: 'proposals' } }),
+  openProposalEditor: (proposalId) => set({ view: { type: 'proposal-editor', proposalId } }),
+  goApprovals: () => set({ view: { type: 'approvals' } }),
+  goWebhooks: () => set({ view: { type: 'webhooks' } }),
+  goNotifications: () => set({ view: { type: 'notifications' } }),
+  goFinancials: () => set({ view: { type: 'financials' } }),
 }))

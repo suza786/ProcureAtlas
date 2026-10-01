@@ -1,5 +1,5 @@
 // ProcureAtlas AI — OCDS-inspired Prisma schema
-// Phase 3: Intelligence Layer — SupplierProfile, BuyerProfile, CompetitorProfile, PartnerSuggestion, Subscription, UsageMetric, Invoice added.
+// Phase 4: Proposal Studio, Approval Workflows, Webhooks, Notifications, Multi-currency.
 // Dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
 // Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
 
@@ -35,6 +35,13 @@ model Tenant {
   notifications Notification[]
   partnerSuggestions PartnerSuggestion[]
   subscription Subscription?
+  proposals Proposal[]
+  approvalChains ApprovalChain[]
+  webhookEndpoints WebhookEndpoint[]
+  webhookDeliveries WebhookDelivery[]
+  notificationPreferences NotificationPreference[]
+  currencyRates CurrencyRate[]
+  bidCostEstimates BidCostEstimate[]
 }
 
 model User {
@@ -424,6 +431,8 @@ model Pursuit {
   complianceItems ComplianceItem[]
   tasks         Task[]
   approvals     Approval[]
+  proposals     Proposal[]
+  bidCostEstimates BidCostEstimate[]
 
   @@index([tenantId])
   @@index([stage])
@@ -492,19 +501,30 @@ model Task {
 
 model Approval {
   id            String   @id @default(cuid())
+  tenantId      String
   pursuitId     String
+  proposalId    String?
+  chainId       String?
+  triggerType   String   @default("bid_decision") // bid_decision | submission | pricing | legal | evidence_verification
+  stepOrder     Int      @default(0)
   requestedBy   String
   approverId    String?
+  approverRole  String?  // required role for this step
   decision      String   @default("pending") // pending | approved | rejected | changes_requested
   reason        String?
+  slaDueAt      DateTime?
   decidedAt     DateTime?
+  escalatedAt   DateTime?
   createdAt     DateTime @default(now())
 
   pursuit       Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
   approver      User?    @relation(fields: [approverId], references: [id])
+  proposal      Proposal? @relation(fields: [proposalId], references: [id])
 
   @@index([pursuitId])
+  @@index([proposalId])
   @@index([decision])
+  @@index([triggerType])
 }
 
 // ============================================================
@@ -875,4 +895,229 @@ model Invoice {
   @@index([subscriptionId])
   @@index([tenantId])
   @@index([status])
+}
+
+// ============================================================
+// Phase 4: Proposal Studio — Proposals, Sections, Versions
+// ============================================================
+
+model Proposal {
+  id              String   @id @default(cuid())
+  tenantId        String
+  pursuitId       String
+  title           String
+  status          String   @default("draft") // draft | in_review | approved | submitted | withdrawn
+  currentVersion  Int      @default(1)
+  totalSections   Int      @default(0)
+  completedSections Int    @default(0)
+  evidenceCoverage Float   @default(0) // 0-1 — % of sections with evidence backing
+  wordCount       Int      @default(0)
+  lastEditedAt    DateTime?
+  lastEditedBy    String?
+  submittedAt     DateTime?
+  exportFormat    String?  // docx | pdf | null
+  exportUrl       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pursuit         Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+  sections        ProposalSection[]
+  versions        ProposalVersion[]
+  approvals       Approval[]
+
+  @@index([tenantId])
+  @@index([pursuitId])
+  @@index([status])
+}
+
+model ProposalSection {
+  id              String   @id @default(cuid())
+  proposalId      String
+  sectionType     String   // executive_summary | technical_approach | methodology | team | past_performance | pricing | compliance | risk | timeline | appendix
+  title           String
+  content         String?  // markdown content
+  wordCount       Int      @default(0)
+  status          String   @default("todo") // todo | drafting | in_review | approved | needs_revision
+  evidenceIds     String?  // JSON array of Evidence IDs backing this section
+  evidenceCount   Int      @default(0)
+  hasGaps         Boolean  @default(false) // true if section makes claims without evidence
+  assignedTo      String?  // user email
+  order           Int      @default(0)
+  aiAssisted      Boolean  @default(false) // true if content was AI-drafted
+  aiModel         String?
+  lastEditedAt    DateTime?
+  lastEditedBy    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  proposal        Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@index([sectionType])
+  @@index([status])
+}
+
+model ProposalVersion {
+  id              String   @id @default(cuid())
+  proposalId      String
+  versionNumber   Int
+  snapshotJson    String   // full snapshot of all sections at this version
+  wordCount       Int
+  sectionCount    Int
+  changeSummary   String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+
+  proposal        Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@index([versionNumber])
+}
+
+// ============================================================
+// Phase 4: Approval Workflows — Configurable chains
+// ============================================================
+
+model ApprovalChain {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String   // e.g. "Bid Submission Approval", "Pricing Approval"
+  triggerType     String   // bid_decision | submission | pricing | legal | evidence_verification
+  isActive        Boolean  @default(true)
+  slaHours        Int      @default(48) // SLA for each step
+  stepsJson       String?  // JSON array of {order, role, approverEmail, autoApprove}
+  stepCount       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([triggerType])
+  @@index([isActive])
+}
+
+// ============================================================
+// Phase 4: Webhooks — Outbound event delivery
+// ============================================================
+
+model WebhookEndpoint {
+  id              String   @id @default(cuid())
+  tenantId        String
+  name            String
+  url             String
+  secret          String   // HMAC signing secret (encrypted at rest in prod)
+  events          String   // space-separated event types
+  isActive        Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  lastResponseCode Int?
+  lastSuccessAt   DateTime?
+  consecutiveFailures Int  @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  deliveries      WebhookDelivery[]
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+model WebhookDelivery {
+  id              String   @id @default(cuid())
+  tenantId        String
+  endpointId      String
+  eventType       String
+  payloadJson     String   // the event payload
+  signature       String   // HMAC-SHA256 signature
+  status          String   @default("pending") // pending | delivered | failed | retrying
+  attemptCount    Int      @default(0)
+  maxAttempts     Int      @default(5)
+  nextRetryAt     DateTime?
+  responseCode    Int?
+  responseBody    String?
+  errorMessage    String?
+  deliveredAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  endpoint        WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([endpointId])
+  @@index([status])
+  @@index([nextRetryAt])
+}
+
+// ============================================================
+// Phase 4: Notification Preferences
+// ============================================================
+
+model NotificationPreference {
+  id              String   @id @default(cuid())
+  tenantId        String
+  userId          String
+  channel         String   // in_app | email | slack | teams
+  eventType       String   // alert | deadline | amendment | extraction_ready | approval_request | system | webhook_delivery
+  enabled         Boolean  @default(true)
+  minSeverity     String   @default("low") // low | medium | high | critical
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, channel, eventType])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+// ============================================================
+// Phase 4: Multi-currency financial modeling
+// ============================================================
+
+model CurrencyRate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  baseCurrency    String   @default("USD")
+  quoteCurrency   String   // BDT | SGD | EUR | GBP | INR | etc.
+  rate            Float    // 1 base = rate quote
+  source          String   @default("manual") // manual | ecb | openexchangerates
+  rateDate        DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, baseCurrency, quoteCurrency])
+  @@index([tenantId])
+}
+
+model BidCostEstimate {
+  id              String   @id @default(cuid())
+  tenantId        String
+  pursuitId       String
+  label           String
+  currency        String   @default("USD")
+  laborCost       Float    @default(0)
+  materialsCost   Float    @default(0)
+  subcontractorCost Float   @default(0)
+  overheadCost    Float    @default(0)
+  travelCost      Float    @default(0)
+  contingencyPct  Float    @default(10) // %
+  totalCost       Float    @default(0)
+  marginPct       Float    @default(20) // %
+  proposedPrice   Float    @default(0)
+  profitAmount    Float    @default(0)
+  notes           String?
+  hedgingNotes    String?
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pursuit         Pursuit  @relation(fields: [pursuitId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([pursuitId])
 }
