@@ -30,6 +30,7 @@ export type View =
   | { type: 'webhooks' }
   | { type: 'notifications' }
   | { type: 'financials' }
+  | { type: 'developer' }
 
 interface DiscoverFilters {
   market: string
@@ -80,6 +81,7 @@ interface AppState {
   goWebhooks: () => void
   goNotifications: () => void
   goFinancials: () => void
+  goDeveloper: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -119,4 +121,5 @@ export const useAppStore = create<AppState>((set) => ({
   goWebhooks: () => set({ view: { type: 'webhooks' } }),
   goNotifications: () => set({ view: { type: 'notifications' } }),
   goFinancials: () => set({ view: { type: 'financials' } }),
+  goDeveloper: () => set({ view: { type: 'developer' } }),
 }))

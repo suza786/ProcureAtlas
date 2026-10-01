@@ -21,6 +21,7 @@ import {
   FileText,
   Webhook,
   Calculator,
+  Code2,
 } from 'lucide-react'
 
 const navItems = [
@@ -45,6 +46,7 @@ const intelligenceItems = [
 ] as const
 
 const systemItems = [
+  { id: 'developer', label: 'Developer Portal', icon: Code2, action: 'goDeveloper' as const },
   { id: 'webhooks', label: 'Webhooks', icon: Webhook, action: 'goWebhooks' as const },
   { id: 'notifications', label: 'Notifications', icon: Bell, action: 'goNotifications' as const },
   { id: 'financials', label: 'Financial Modeling', icon: Calculator, action: 'goFinancials' as const },
@@ -75,8 +77,9 @@ export function Sidebar() {
   const goWebhooks = useAppStore((s) => s.goWebhooks)
   const goNotifications = useAppStore((s) => s.goNotifications)
   const goFinancials = useAppStore((s) => s.goFinancials)
+  const goDeveloper = useAppStore((s) => s.goDeveloper)
 
-  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling, goProposals, goApprovals, goWebhooks, goNotifications, goFinancials }
+  const actionMap = { goCommand, goDiscover, goCompany, goPursuits, goAudit, goExtractions, goConnectors, goSettings, goBuyerIntel, goAwardIntel, goCompetitorIntel, goPartnerFinder, goAdmin, goBilling, goProposals, goApprovals, goWebhooks, goNotifications, goFinancials, goDeveloper }
 
   const isActive = (id: string) => {
     if (id === 'command' && view.type === 'command') return true
@@ -98,6 +101,7 @@ export function Sidebar() {
     if (id === 'webhooks' && view.type === 'webhooks') return true
     if (id === 'notifications' && view.type === 'notifications') return true
     if (id === 'financials' && view.type === 'financials') return true
+    if (id === 'developer' && view.type === 'developer') return true
     return false
   }
 
@@ -109,7 +113,7 @@ export function Sidebar() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="text-sm font-semibold text-slate-900">ProcureAtlas</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 4</span>
+          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 5</span>
         </div>
       </div>
 

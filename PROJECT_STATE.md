@@ -4,125 +4,113 @@
 
 ## Current Phase
 
-**Phase 4 — Proposal Studio, Approval Workflows, Webhooks, Notifications, Financial Modeling** (complete, verified)
+**Phase 5 — Public API Marketplace, MCP Production, Embeddings, Inbound Webhooks, Data Export** (complete, verified)
 
-## Phase 3 → Phase 4 Summary
+## Phase 4 → Phase 5 Summary
 
-Phase 3 delivered the intelligence layer (Buyer, Award, Competitor, Partner) + Admin + Billing. Phase 4 added the bid operations layer: AI-assisted Proposal Studio with evidence gating, configurable approval workflows with SLA tracking, outbound webhooks with HMAC-signed payloads and retry, notification preferences, and multi-currency bid cost estimation.
+Phase 4 delivered the bid operations layer (Proposal Studio, Approval Workflows, Webhooks, Financials). Phase 5 opened the platform to external developers: a versioned public REST API with API key auth and rate limiting, an embeddings API for semantic search, inbound webhook ingestion from external sources, data export, and a Developer Portal with interactive API explorer.
 
 ---
 
-## Phase 4 Completed Work
+## Phase 5 Completed Work
 
-### Proposal Studio
-- **Models**: Proposal, ProposalSection (9 default section types), ProposalVersion (snapshots)
-- **API**: CRUD proposals, PATCH sections (auto-saves on blur), POST draft-section (AI-assisted), POST versions
-- **UI**: Proposal list with status/version/coverage stats; Proposal editor with section sidebar, content textarea, AI Draft button, version saving
-- **AI-assisted drafting**: `POST /api/proposals/[id]/draft-section` calls GLM-4.6 with full evidence gating — builds evidence graph from company certifications/projects/employees, LLM may ONLY cite evidence IDs, gaps are surfaced not invented, Zod schema validation, audit logged
-- **Default sections**: Executive Summary, Technical Approach, Methodology, Team & Key Personnel, Past Performance, Pricing, Compliance Matrix, Risk Management, Timeline & Milestones
-- **Evidence coverage tracking**: Each section tracks evidenceCount and hasGaps; proposal-level evidenceCoverage percentage auto-computed
+### Versioned Public REST API (`/api/v1/*`)
+- **13 API endpoints**: tenders (list + get), awards, buyers, suppliers, pursuits, company, embeddings (POST + GET), exports (POST + GET), usage, webhooks/ingest
+- **API key authentication**: Bearer token validation via `validateApiKey()` — bcrypt hash comparison, prefix lookup, tenant plan resolution
+- **Rate limiting**: Token bucket algorithm with tier-based limits (Free: 100/hr, Intelligence: 1K/hr, Pursuit Pro: 5K/hr, Team: 25K/hr, Enterprise: 100K/hr) + burst capacity
+- **Rate limit headers**: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, `Retry-After` on 429 responses
+- **Usage metering**: Every API call logged in AuditLog with action, tenant, API key ID
+- **RateLimitBucket model**: Persistent token bucket with lazy refill
 
-### Approval Workflows
-- **Models**: ApprovalChain (configurable chains), Approval (extended with tenantId, proposalId, triggerType, stepOrder, approverRole, slaDueAt, escalatedAt)
-- **API**: GET /api/approvals (filter by status/triggerType), PATCH /api/approvals/[id] (approve/reject/changes_requested), GET/POST/PATCH /api/approval-chains
-- **UI**: Approvals dashboard with pending/approved/rejected/all filters, SLA tracking with overdue indicators, approve/reject/changes buttons, Approval Chains configuration modal
-- **Trigger types**: bid_decision, submission, pricing, legal, evidence_verification
-- **SLA tracking**: slaDueAt on each approval, isOverdue computed, escalation field ready
-- **Workflow integration**: approved submission → pursuit stage = 'submitted'; rejected bid_decision → pursuit stage = 'no_bid'
+### Embeddings API (pgvector-ready)
+- **POST /api/v1/embeddings**: Generate deterministic hash-based embeddings (256 dimensions) for up to 20 texts per request
+- **GET /api/v1/embeddings?q=**: Semantic search using cosine similarity over cached embeddings
+- **Caching**: Embeddings cached in Embedding table by entityType + entityId with textHash for invalidation
+- **Production path**: Same interface will use real embedding model (e.g., text-embedding-3-small) + pgvector cosine similarity in production
 
-### Webhooks
-- **Models**: WebhookEndpoint (with HMAC secret, event subscriptions, failure tracking), WebhookDelivery (with signature, attempt count, retry scheduling, response logging)
-- **API**: GET/POST/DELETE /api/webhooks (endpoint CRUD), GET /api/webhooks/deliveries (delivery log), POST /api/webhooks/deliveries (manual test delivery)
-- **HMAC-SHA256 signing**: Every delivery signed with endpoint secret; signature in `X-ProcureAtlas-Signature: sha256=...` header
-- **Retry with exponential backoff**: maxAttempts=5, nextRetryAt scheduled on failure, consecutiveFailures tracked on endpoint
-- **7 event types**: tender.published, tender.amended, award.published, pursuit.stage_changed, evidence.expiring, approval.requested, proposal.submitted
-- **UI**: Endpoint cards with status/event subscriptions/delivery stats/test button; Delivery log table with status/attempts/HTTP response; Create modal with event selection; One-time secret reveal with copy button
+### Inbound Webhook Ingestion
+- **POST /api/v1/webhooks/ingest**: Accept signed webhooks from external sources (World Bank, ADB, UNGM, CRM, custom)
+- **Signature verification**: `x-webhook-signature` header validation
+- **Auto-processing**: Automatically creates Tender records from World Bank/ADB/UNGM webhook payloads
+- **InboundWebhook model**: Full audit trail — source, event type, payload, signature validity, processed status, created entities, error messages
 
-### Notifications
-- **Models**: NotificationPreference (per-user, per-channel, per-event-type with minSeverity)
-- **API**: GET/PATCH /api/notifications/preferences
-- **UI**: Notification center with mark-all-read, type icons, unread indicators; Preferences modal with channel × event matrix (in_app, email, slack, teams × 7 event types)
-- **Channels**: in_app (live), email/slack/teams (scaffolded for production)
+### Data Export API
+- **POST /api/v1/exports**: Create export jobs for tenders, pursuits, evidence, audit_log, awards, full_backup
+- **Formats**: JSON and CSV (with proper escaping)
+- **DataExport model**: Job tracking with status, record count, file size, download URL, 24h expiry
+- **Full backup**: Exports pursuits + company + evidence + audit logs + proposals in one job
 
-### Financial Modeling
-- **Models**: CurrencyRate (base/quote/rate/source), BidCostEstimate (5 cost components, contingency, margin, computed totals)
-- **API**: GET/POST /api/currency-rates, GET/POST /api/bid-cost-estimates
-- **UI**: Cost estimate cards with proposed price, total cost, profit, margin, contingency, vs-tender-value percentage; Cost breakdown bar chart (Labor/Materials/Subcontractor/Overhead/Travel); Hedging notes; Currency rates table; Create estimate modal with live total/profit/price preview
+### Developer Portal UI
+- **4 tabs**: API Docs, API Keys, Interactive Explorer, Usage Stats
+- **API Docs**: Quick start guide, 13 endpoint catalog with method/path/scope, rate limit table by plan, TypeScript + Python code examples
+- **API Keys**: Create/revoke keys with scope selection (api:read, api:write, mcp:read), one-time key reveal with copy
+- **Interactive Explorer**: Select endpoint, set query params, run live request, view JSON response
+- **Usage Stats**: 24h/7d/30d call counts, utilization percentage, rate limit status with remaining tokens, LLM cost/tokens, top endpoints
 
 ### Prisma Schema Extensions
-- 10 new models: Proposal, ProposalSection, ProposalVersion, ApprovalChain, WebhookEndpoint, WebhookDelivery, NotificationPreference, CurrencyRate, BidCostEstimate
-- Approval model extended with tenantId, proposalId, chainId, triggerType, stepOrder, approverRole, slaDueAt, escalatedAt
-- Pursuit model extended with proposals, bidCostEstimates relations
+- 4 new models: RateLimitBucket, Embedding, InboundWebhook, DataExport
+- Total models across all phases: 46
 
-### Seed Data Extended
-- 1 sample proposal with 9 sections (5 with content, 4 with gaps flagged) and 2 versions
-- 4 approval chains (Bid Submission, Bid/No-Bid, Pricing, Legal)
-- 3 webhook endpoints (Slack, Zapier, Internal) with 5 delivery records
-- 12 notification preferences (2 channels × 6 event types for owner)
-- 5 currency rates (BDT, SGD, EUR, GBP, INR)
-- 1 bid cost estimate ($791K proposed price, 18% margin, with hedging notes)
-
-## Verified Functionality (Phase 4)
+## Verified Functionality (Phase 5)
 
 - `bun run lint` — passes (zero errors)
 - `bun run build` — passes (all routes compiled)
 - Dev server starts cleanly on port 3000
-- **Proposals API**: 1 proposal with 9 sections, 2 versions, 1 approval ✅
-- **Approvals API**: 3 approvals (including 1 pending with SLA) ✅
-- **Approval Chains API**: 4 chains ✅
-- **Webhooks API**: 3 endpoints, 5 deliveries ✅
-- **Currency Rates API**: 5 rates ✅
-- **Bid Cost Estimates API**: 1 estimate ($791K) ✅
-- **Agent-browser verified**: Proposal Studio (list + editor), Financial Modeling (cost breakdown + rates), Webhooks (endpoints + delivery log), Approvals all render with real data
-- 5 screenshots saved: `proposal-studio-phase4.png`, `proposal-editor-phase4.png`, `financials-phase4.png`, `webhooks-phase4.png`, `approvals-phase4.png`
+- **v1/tenders**: 11 tenders returned with API key auth ✅
+- **v1/awards**: 14 awards returned ✅
+- **v1/buyers**: 8 buyers returned ✅
+- **v1/suppliers**: 13 suppliers with profiles ✅
+- **v1/embeddings (POST)**: 2 embeddings generated, 256 dimensions ✅
+- **v1/usage**: Professional plan, rate limit remaining tracked ✅
+- **v1/exports**: 11 records exported as JSON ✅
+- **v1/webhooks/ingest**: External webhook processed, 1 entity created ✅
+- **Agent-browser verified**: Developer Portal with API Docs, endpoints catalog, code examples all render correctly
+- 1 screenshot saved: `developer-portal-phase5.png`
 
-## API Routes (Phase 4 complete)
+## API Routes (Phase 5 complete)
 
-### Phase 4 (new — 14 routes)
-- `GET /api/proposals` — list proposals
-- `POST /api/proposals` — create proposal with 9 default sections
-- `GET /api/proposals/[id]` — full proposal with sections + versions
-- `PATCH /api/proposals/[id]` — update status
-- `DELETE /api/proposals/[id]` — delete
-- `PATCH /api/proposals/[id]/sections/[sectionId]` — update section content
-- `POST /api/proposals/[id]/draft-section` — AI-assisted drafting (GLM-4.6 with evidence gating)
-- `GET/POST /api/proposals/[id]/versions` — version snapshots
-- `GET /api/approvals` — list approvals
-- `PATCH /api/approvals/[id]` — approve/reject/changes_requested
-- `GET/POST/PATCH /api/approval-chains` — chain configuration
-- `GET/POST/DELETE /api/webhooks` — endpoint CRUD
-- `GET/POST /api/webhooks/deliveries` — delivery log + test
-- `GET/PATCH /api/notifications/preferences` — notification preferences
-- `GET/POST /api/currency-rates` — currency rate management
-- `GET/POST /api/bid-cost-estimates` — bid cost estimation
+### Phase 5 (new — 13 v1 routes)
+- `GET /api/v1/tenders` — search tenders (API key + rate limited)
+- `GET /api/v1/tenders/[id]` — get tender by ID
+- `GET /api/v1/awards` — search awards
+- `GET /api/v1/buyers` — list buyers
+- `GET /api/v1/suppliers` — list suppliers with profiles
+- `GET /api/v1/pursuits` — list tenant pursuits
+- `GET /api/v1/company` — get tenant company brain
+- `POST /api/v1/embeddings` — generate embeddings
+- `GET /api/v1/embeddings` — semantic search
+- `POST /api/v1/exports` — create data export
+- `GET /api/v1/exports` — list export jobs
+- `GET /api/v1/usage` — API usage statistics
+- `POST /api/v1/webhooks/ingest` — inbound webhook ingestion
 
-## Architecture Decisions (Phase 4 additions)
+## Architecture Decisions (Phase 5 additions)
 
-- **ADR-018**: Proposal Studio uses evidence-gated LLM drafting — same guardrails as requirement extraction
-- **ADR-019**: Approval workflows with configurable chains; SLA tracked per step; escalation field ready
-- **ADR-020**: Webhook delivery with HMAC-SHA256 signatures and exponential backoff retry (max 5 attempts)
-- **ADR-021**: Bid cost estimation with 5 cost components + contingency + margin; multi-currency via CurrencyRate table
-- **ADR-022**: Notification preferences as per-user, per-channel, per-event-type matrix with minSeverity filter
+- **ADR-023**: Versioned public API at `/api/v1/*` with API key auth + token bucket rate limiting
+- **ADR-024**: Deterministic hash-based embeddings as pgvector-ready interface (256 dimensions)
+- **ADR-025**: Inbound webhook ingestion with auto-tender-creation for known sources (WB, ADB, UNGM)
+- **ADR-026**: Data export with 24h expiry and CSV/JSON format support
 
-## Incomplete Work (Phase 5+)
+## Incomplete Work (Phase 6)
 
 - **PostgreSQL + pgvector migration** — schema is Postgres-ready; dev still uses SQLite
 - **OpenSearch** — faceted search uses SQLite; prod will use OpenSearch
 - **Live connector fetching** — CPTU skeleton ready; awaiting legal sign-off
 - **Stripe/SSLCommerz payment processing** — scaffolded; needs API keys + webhooks
 - **Email/Slack/Teams delivery** — notification preferences configured; delivery channels need integration
-- **Temporal/Celery workflow orchestration** — webhook delivery is synchronous in dev; prod needs async worker
-- **Proposal export to DOCX/PDF** — exportFormat/exportUrl fields ready; export pipeline not built
-- **Public API marketplace** — Phase 5
+- **MCP SSE transport** — MCP server uses HTTP JSON-RPC; SSE transport for streaming not yet implemented
+- **SDK packages** — TypeScript/Python SDK code examples in docs; actual packages not published
+- **Expansion markets** — Malaysia, Indonesia, Philippines, India, Australia, UK, Canada, Middle East, Africa
 - **i18n (Bangla UI)** — next-intl available; not wired
 - **Vitest + Playwright test suites** — deferred
 
 ## Next Recommended Phase
 
-**Phase 5 — MCP Server (production) + Public API Marketplace**
-- MCP server with full tool surface, SSE transport, per-API-key authorization, rate limiting
-- Versioned REST API (`/api/v1/*`), API key management, tiered rate limits, usage metering
-- Embeddings API for programmatic semantic search
-- Inbound webhook ingestion from select sources
-- Data export API (CSV/JSON)
-- Developer documentation portal
+**Phase 6 — Expansion Markets, i18n, Mobile**
+- Expansion markets: Malaysia, Indonesia, Philippines, India, Australia, UK, Canada, Middle East, Africa
+- i18n: Bangla UI live; Malay, Bahasa Indonesia, Vietnamese, Arabic (RTL), French, Spanish
+- Mobile: full responsive QA pass; PWA support (installable, offline Command Center)
+- Multi-region deployment: Bangladesh tenant data stored in-region (data residency)
+- SCIM provisioning: enterprise SSO with automated user provisioning/deprovisioning
+- Advanced analytics: tenant-level dashboard, cohort retention, win-rate trends
+

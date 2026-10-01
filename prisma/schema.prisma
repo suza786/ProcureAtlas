@@ -1,5 +1,5 @@
 // ProcureAtlas AI — OCDS-inspired Prisma schema
-// Phase 4: Proposal Studio, Approval Workflows, Webhooks, Notifications, Multi-currency.
+// Phase 5: Public API Marketplace, MCP Production, Embeddings, Inbound Webhooks, Data Export.
 // Dev: SQLite. Schema is PostgreSQL-ready (no SQLite-only types used in app-level fields).
 // Multi-tenancy: every tenant-scoped model has tenantId + service-layer enforcement.
 
@@ -1120,4 +1120,80 @@ model BidCostEstimate {
 
   @@index([tenantId])
   @@index([pursuitId])
+}
+
+// ============================================================
+// Phase 5: Public API Marketplace — Rate limiting, Embeddings, Inbound Webhooks, Data Export
+// ============================================================
+
+model RateLimitBucket {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  apiKeyId        String?
+  identifier      String   // IP hash or API key prefix
+  bucketKey       String   // e.g. "api:v1:tenders" or "mcp:tools/call"
+  tokens          Float    @default(100) // token bucket model
+  lastRefilledAt  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([identifier, bucketKey])
+  @@index([apiKeyId])
+  @@index([tenantId])
+}
+
+model Embedding {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  entityType      String   // tender | company | evidence | requirement
+  entityId        String
+  embeddingJson   String   // JSON array of floats (deterministic hash-based in dev; pgvector in prod)
+  textHash        String   // hash of the source text for cache invalidation
+  model           String   @default("deterministic-v1")
+  dimensions      Int      @default(256)
+  metadataJson    String?  // additional metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([entityType, entityId])
+  @@index([tenantId])
+  @@index([entityType])
+}
+
+model InboundWebhook {
+  id              String   @id @default(cuid())
+  tenantId        String?
+  source          String   // worldbank | adb | ungm | external_crm | custom
+  eventType       String
+  signature       String?  // signature from source for verification
+  signatureValid  Boolean  @default(false)
+  payloadJson     String   // raw payload
+  processedStatus String   @default("pending") // pending | processed | failed | ignored
+  processedAt     DateTime?
+  errorMessage    String?
+  createdEntities String?  // JSON array of created entity IDs
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([source])
+  @@index([processedStatus])
+}
+
+model DataExport {
+  id              String   @id @default(cuid())
+  tenantId        String
+  requestedById   String?
+  exportType      String   // tenders | pursuits | evidence | audit_log | full_backup | awards
+  format          String   @default("json") // json | csv
+  status          String   @default("pending") // pending | processing | completed | failed
+  recordCount     Int      @default(0)
+  fileSizeKb      Int      @default(0)
+  downloadUrl     String?
+  expiresAt       DateTime?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+
+  @@index([tenantId])
+  @@index([status])
 }

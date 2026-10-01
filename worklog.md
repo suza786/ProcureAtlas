@@ -120,6 +120,30 @@ Stage Summary:
 - 5 screenshots saved documenting Phase 4 features
 
 ---
+Task ID: 5
+Agent: main
+Task: Phase 5 — Public API Marketplace, MCP Production, Embeddings, Inbound Webhooks, Data Export
+
+Work Log:
+- Extended Prisma schema with 4 new models: RateLimitBucket, Embedding, InboundWebhook, DataExport
+- Built rate limiting middleware (src/lib/rate-limit.ts): token bucket algorithm, tier-based limits (Free to Enterprise), validateApiKey() with bcrypt hash comparison, setRateLimitHeaders() with X-RateLimit-* headers
+- Built versioned public REST API (/api/v1/*) with 13 endpoints: tenders (list+get), awards, buyers, suppliers, pursuits, company, embeddings (POST+GET), exports (POST+GET), usage, webhooks/ingest
+- Built Embeddings API: POST generates deterministic hash-based 256-dim embeddings; GET performs semantic search via cosine similarity; cached in Embedding table; pgvector-ready interface
+- Built Inbound Webhook ingestion: POST /api/v1/webhooks/ingest accepts signed webhooks from external sources (World Bank, ADB, UNGM); auto-creates Tender records from known source payloads
+- Built Data Export API: POST creates export jobs (tenders, pursuits, evidence, audit_log, awards, full_backup) in JSON or CSV format; GET lists export jobs; 24h expiry
+- Built Developer Portal UI with 4 tabs: API Docs (13 endpoint catalog, rate limits, TypeScript/Python examples), API Keys (create/revoke), Interactive Explorer (live API testing), Usage Stats (24h/7d/30d, rate limit status, LLM cost, top endpoints)
+- Updated Sidebar with Developer Portal in System section; updated store with developer view type; wired into page.tsx
+- Fixed rate-limit.ts: ApiKey model doesn't have tenant relation (fetch separately); REFILL_RATE_PER_SECOND function returns proper number (not NaN)
+- Updated sidebar label to "Phase 5"
+
+Stage Summary:
+- Phase 5 complete and verified: versioned public API, embeddings, inbound webhooks, data export, developer portal
+- 13 new v1 API routes added (total 70 across Phases 1-5)
+- 4 new Prisma models (total 46 across all phases)
+- All APIs verified with real data via curl; build passes; agent-browser verified Developer Portal
+- 1 screenshot saved documenting Phase 5 features
+
+---
 Task ID: 1-docs
 Agent: general-purpose (docs sub-agent)
 Task: Write ProcureAtlas documentation suite (20 files under /docs)

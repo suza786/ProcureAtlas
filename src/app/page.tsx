@@ -27,6 +27,7 @@ import { Approvals } from '@/components/views/Approvals'
 import { Webhooks } from '@/components/views/Webhooks'
 import { Notifications } from '@/components/views/Notifications'
 import { Financials } from '@/components/views/Financials'
+import { Developer } from '@/components/views/Developer'
 
 export default function Home() {
   const view = useAppStore((s) => s.view)
@@ -82,6 +83,7 @@ export default function Home() {
           {view.type === 'webhooks' && <Webhooks />}
           {view.type === 'notifications' && <Notifications />}
           {view.type === 'financials' && <Financials />}
+          {view.type === 'developer' && <Developer />}
         </main>
       </div>
     </div>
