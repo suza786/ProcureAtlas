@@ -1,9 +1,10 @@
+import { withApiErrors } from '@/lib/api-errors'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/company — Company Brain payload for the current tenant
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
   if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
@@ -73,4 +74,4 @@ export async function GET() {
       verifiedEvidenceCount: company.evidence.filter(e => e.verified).length,
     },
   })
-}
+})

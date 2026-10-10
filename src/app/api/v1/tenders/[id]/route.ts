@@ -1,13 +1,17 @@
+import { parseIds } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 
 // GET /api/v1/tenders/[id] — public API: get tender by ID
-export async function GET(
+export const GET = withApiErrors(async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -19,7 +23,7 @@ export async function GET(
     return res
   }
 
-  const { id } = await params
+  const { id } = parseIds(await params)
 
   const tender = await db.tender.findUnique({
     where: { id },
@@ -39,4 +43,4 @@ export async function GET(
   const res = NextResponse.json(tender)
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})

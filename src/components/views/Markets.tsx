@@ -1,6 +1,10 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+
+import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Globe, Building2, Shield, Languages, DollarSign, Database, ExternalLink } from 'lucide-react'
 
@@ -59,27 +63,23 @@ const LEGAL_COLORS: Record<string, string> = {
 }
 
 export function Markets() {
-  const [items, setItems] = useState<MarketItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { t } = useTranslation()
+
   const [regionFilter, setRegionFilter] = useState('all')
 
-  useEffect(() => {
-    fetch('/api/markets')
-      .then(r => r.json())
-      .then(d => { setItems(d.items ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, loading, error, refetch } = useApiQuery<{ items: MarketItem[] }>('/api/markets')
+  const items = data?.items ?? []
 
   const regions = [...new Set(items.map(m => m.region))]
   const filtered = regionFilter === 'all' ? items : items.filter(m => m.region === regionFilter)
 
   return (
     <div className="space-y-4">
+      {error && <div role="alert" className="text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Globe className="h-6 w-6 text-slate-700" />
-          Expansion Markets
-        </h1>
+          {t("Expansion Markets")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           Global procurement market catalog with connector status, legal compliance, and data residency rules.
         </p>
@@ -112,7 +112,7 @@ export function Markets() {
 
       {/* Market cards */}
       {loading ? (
-        <div className="p-8 text-center text-sm text-slate-500">Loading markets...</div>
+        <div className="p-8 text-center text-sm text-slate-500">{t("Loading markets...")}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(m => (
@@ -148,17 +148,17 @@ export function Markets() {
               <div className="grid grid-cols-2 gap-2 text-xs mt-3">
                 <div className="flex items-center gap-1">
                   <Languages className="h-3 w-3 text-slate-400" />
-                  <span className="text-slate-500">Lang:</span>
+                  <span className="text-slate-500">{t("Lang:")}</span>
                   <span className="font-medium text-slate-700">{LANG_LABELS[m.primaryLanguage] ?? m.primaryLanguage}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <DollarSign className="h-3 w-3 text-slate-400" />
-                  <span className="text-slate-500">Currency:</span>
+                  <span className="text-slate-500">{t("Currency:")}</span>
                   <span className="font-medium text-slate-700">{m.currency}</span>
                 </div>
                 <div className="flex items-center gap-1 col-span-2">
                   <Database className="h-3 w-3 text-slate-400" />
-                  <span className="text-slate-500">Data residency:</span>
+                  <span className="text-slate-500">{t("Data residency:")}</span>
                   <span className={cn(
                     'font-medium',
                     m.dataResidency === 'in_region' ? 'text-amber-700' : 'text-emerald-700'
@@ -170,7 +170,7 @@ export function Markets() {
 
               {m.lastReviewedAt && (
                 <p className="text-[10px] text-slate-400 mt-2 pt-2 border-t border-slate-100">
-                  Last reviewed: {new Date(m.lastReviewedAt).toLocaleDateString()}
+                  {t("Last reviewed:")}{new Date(m.lastReviewedAt).toLocaleDateString()}
                 </p>
               )}
             </div>

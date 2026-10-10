@@ -1,10 +1,16 @@
+import { pagination, validatedSearch } from '@/lib/api-validation'
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
+import { initializePursuit } from '@/lib/pursuit-workflow'
 
 // GET /api/pursuits — list pursuits for tenant
-export async function GET() {
+export const GET = withApiErrors(async function GET(req: Request) {
+  const { limit, offset } = pagination(validatedSearch(req))
   const ctx = await getCurrentTenant()
 
   const pursuits = await db.pursuit.findMany({
@@ -16,6 +22,7 @@ export async function GET() {
       _count: { select: { complianceItems: true, tasks: true, approvals: true } },
     },
     orderBy: { updatedAt: 'desc' },
+    take: limit, skip: offset,
   })
 
   return NextResponse.json({
@@ -57,48 +64,24 @@ export async function GET() {
       counts: { compliance: p._count.complianceItems, tasks: p._count.tasks, approvals: p._count.approvals },
     })),
   })
-}
+})
 
 // POST /api/pursuits — create a pursuit (bid/no-bid decision recorded)
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { tenderId, companyId, stage, bidDecision, decisionReason, priority } = body
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('contributor')
+  const body = await readJson(req, 'pursuit')
+  const { tenderId, companyId, priority } = body
+  const { pursuit, created } = await db.$transaction(tx => initializePursuit(tx, ctx.tenantId, tenderId, companyId, priority), { isolationLevel: 'Serializable' })
 
-  if (!tenderId || !companyId) {
-    return NextResponse.json({ error: 'tenderId and companyId required' }, { status: 400 })
-  }
-
-  // Verify company belongs to tenant
-  const company = await db.company.findFirst({
-    where: { id: companyId, tenantId: ctx.tenantId },
-  })
-  if (!company) {
-    return NextResponse.json({ error: 'Company not found in tenant scope' }, { status: 404 })
-  }
-
-  const pursuit = await db.pursuit.create({
-    data: {
-      tenantId: ctx.tenantId,
-      tenderId,
-      companyId,
-      stage: stage ?? 'discovering',
-      bidDecision: bidDecision ?? 'pending',
-      decisionReason: decisionReason ?? null,
-      priority: priority ?? 'medium',
-      decidedAt: bidDecision && bidDecision !== 'pending' ? new Date() : null,
-    },
-  })
-
-  await logAction({
+  if (created) await logAction({
     tenantId: ctx.tenantId,
     userId: ctx.userId,
     action: 'pursuit_created',
     entityType: 'pursuit',
     entityId: pursuit.id,
-    afterJson: { stage, bidDecision, tenderId, companyId },
+    afterJson: { stage: pursuit.stage, bidDecision: pursuit.bidDecision, tenderId, companyId: pursuit.companyId },
     request: req,
   })
 
-  return NextResponse.json(pursuit, { status: 201 })
-}
+  return NextResponse.json(pursuit, { status: created ? 201 : 200 })
+})

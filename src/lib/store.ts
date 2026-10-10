@@ -1,7 +1,8 @@
 // ProcureAtlas AI — Client-side view routing store (Phase 2)
-// MVP constraint: only `/` is externally visible. All module navigation is client-side via Zustand.
+// Modules remain on `/`; query parameters restore shareable client navigation.
 
 import { create } from 'zustand'
+import { defaultDiscoverFilters, navigationUrl, readNavigation } from './navigation'
 
 export type View =
   | { type: 'command' }
@@ -88,48 +89,86 @@ interface AppState {
   goMarkets: () => void
   locale: 'en' | 'bn'
   setLocale: (locale: 'en' | 'bn') => void
+  timeZone: string
+  setTimeZone: (timeZone: string) => void
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   view: { type: 'command' },
-  setView: (view) => set({ view }),
+  setView: (view) => {
+    const safeView = readNavigation(navigationUrl('/', view, get().discoverFilters).split('?')[1] ?? '').view
+    writeNavigation(safeView, get().discoverFilters)
+    set({ view: safeView })
+  },
 
-  discoverFilters: { market: 'all', sector: 'all', search: '', status: 'active' },
-  setDiscoverFilters: (f) =>
-    set((s) => ({ discoverFilters: { ...s.discoverFilters, ...f } })),
+  discoverFilters: { ...defaultDiscoverFilters },
+  setDiscoverFilters: (f) => {
+    const discoverFilters = { ...get().discoverFilters, ...f }
+    writeNavigation(get().view, discoverFilters)
+    set({ discoverFilters })
+  },
 
   auth: { authenticated: false, user: null },
   setAuth: (auth) => set({ auth }),
 
-  openTender: (tenderId) => set({ view: { type: 'tender', tenderId } }),
-  openBidRoom: (pursuitId) => set({ view: { type: 'bid-room', pursuitId } }),
-  openCompliance: (pursuitId) => set({ view: { type: 'compliance', pursuitId } }),
-  goCommand: () => set({ view: { type: 'command' } }),
-  goDiscover: () => set({ view: { type: 'discover' } }),
-  goCompany: () => set({ view: { type: 'company' } }),
-  goPursuits: () => set({ view: { type: 'pursuits' } }),
-  goAudit: () => set({ view: { type: 'audit' } }),
-  goExtractions: () => set({ view: { type: 'extractions' } }),
-  goConnectors: () => set({ view: { type: 'connectors' } }),
-  goSettings: () => set({ view: { type: 'settings' } }),
-  goSignIn: () => set({ view: { type: 'sign-in' } }),
-  goBuyerIntel: () => set({ view: { type: 'buyer-intel' } }),
-  openBuyerDetail: (organizationId) => set({ view: { type: 'buyer-detail', organizationId } }),
-  goAwardIntel: () => set({ view: { type: 'award-intel' } }),
-  goCompetitorIntel: () => set({ view: { type: 'competitor-intel' } }),
-  openCompetitorDetail: (organizationId) => set({ view: { type: 'competitor-detail', organizationId } }),
-  goPartnerFinder: () => set({ view: { type: 'partner-finder' } }),
-  goAdmin: () => set({ view: { type: 'admin' } }),
-  goBilling: () => set({ view: { type: 'billing' } }),
-  goProposals: () => set({ view: { type: 'proposals' } }),
-  openProposalEditor: (proposalId) => set({ view: { type: 'proposal-editor', proposalId } }),
-  goApprovals: () => set({ view: { type: 'approvals' } }),
-  goWebhooks: () => set({ view: { type: 'webhooks' } }),
-  goNotifications: () => set({ view: { type: 'notifications' } }),
-  goFinancials: () => set({ view: { type: 'financials' } }),
-  goDeveloper: () => set({ view: { type: 'developer' } }),
-  goAnalytics: () => set({ view: { type: 'analytics' } }),
-  goMarkets: () => set({ view: { type: 'markets' } }),
+  openTender: (tenderId) => get().setView({ type: 'tender', tenderId }),
+  openBidRoom: (pursuitId) => get().setView({ type: 'bid-room', pursuitId }),
+  openCompliance: (pursuitId) => get().setView({ type: 'compliance', pursuitId }),
+  goCommand: () => get().setView({ type: 'command' }),
+  goDiscover: () => get().setView({ type: 'discover' }),
+  goCompany: () => get().setView({ type: 'company' }),
+  goPursuits: () => get().setView({ type: 'pursuits' }),
+  goAudit: () => get().setView({ type: 'audit' }),
+  goExtractions: () => get().setView({ type: 'extractions' }),
+  goConnectors: () => get().setView({ type: 'connectors' }),
+  goSettings: () => get().setView({ type: 'settings' }),
+  goSignIn: () => get().setView({ type: 'sign-in' }),
+  goBuyerIntel: () => get().setView({ type: 'buyer-intel' }),
+  openBuyerDetail: (organizationId) => get().setView({ type: 'buyer-detail', organizationId }),
+  goAwardIntel: () => get().setView({ type: 'award-intel' }),
+  goCompetitorIntel: () => get().setView({ type: 'competitor-intel' }),
+  openCompetitorDetail: (organizationId) => get().setView({ type: 'competitor-detail', organizationId }),
+  goPartnerFinder: () => get().setView({ type: 'partner-finder' }),
+  goAdmin: () => get().setView({ type: 'admin' }),
+  goBilling: () => get().setView({ type: 'billing' }),
+  goProposals: () => get().setView({ type: 'proposals' }),
+  openProposalEditor: (proposalId) => get().setView({ type: 'proposal-editor', proposalId }),
+  goApprovals: () => get().setView({ type: 'approvals' }),
+  goWebhooks: () => get().setView({ type: 'webhooks' }),
+  goNotifications: () => get().setView({ type: 'notifications' }),
+  goFinancials: () => get().setView({ type: 'financials' }),
+  goDeveloper: () => get().setView({ type: 'developer' }),
+  goAnalytics: () => get().setView({ type: 'analytics' }),
+  goMarkets: () => get().setView({ type: 'markets' }),
   locale: 'en',
-  setLocale: (locale) => set({ locale }),
+  setLocale: (locale) => { savePreference('locale', locale); updateDocumentLocale(locale); set({ locale }) },
+  timeZone: 'Asia/Dhaka',
+  setTimeZone: (timeZone) => { try { new Intl.DateTimeFormat('en', { timeZone }); savePreference('timeZone', timeZone); set({ timeZone }) } catch {} },
 }))
+
+function savePreference(key: string, value: string) {
+  if (typeof window !== 'undefined') { try { window.localStorage.setItem('procureatlas.' + key, value) } catch {} }
+}
+function updateDocumentLocale(locale: 'en' | 'bn') {
+  if (typeof document !== 'undefined') document.documentElement.lang = locale
+}
+function writeNavigation(view: View, filters: DiscoverFilters) {
+  if (typeof window === 'undefined') return
+  const target = navigationUrl(window.location.href, view, filters)
+  if (target !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState(window.history.state, '', target)
+}
+/** Restore directly, so Back/Forward never adds history entries. */
+export function bindUrlNavigation(): () => void {
+  if (typeof window === 'undefined') return () => {}
+  const restore = () => useAppStore.setState(readNavigation(window.location.search))
+  restore()
+  try {
+    const locale = window.localStorage.getItem('procureatlas.locale')
+    if (locale === 'en' || locale === 'bn') useAppStore.setState({ locale })
+    const timeZone = window.localStorage.getItem('procureatlas.timeZone')
+    if (timeZone) { new Intl.DateTimeFormat('en', { timeZone }); useAppStore.setState({ timeZone }) }
+  } catch {}
+  updateDocumentLocale(useAppStore.getState().locale)
+  window.addEventListener('popstate', restore)
+  return () => window.removeEventListener('popstate', restore)
+}

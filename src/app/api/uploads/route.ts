@@ -1,3 +1,7 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
@@ -5,55 +9,44 @@ import { logAction } from '@/lib/auth'
 import crypto from 'crypto'
 import fs from 'fs/promises'
 import path from 'path'
+import { getTenantUploadDirectory, UPLOAD_ROOT } from '@/lib/upload-security'
+import { idSchema } from '@/lib/api-validation'
+import { boundedFormData, validateUploadContent } from '@/lib/upload-processing'
+import { enqueueOutbox } from '@/lib/outbox'
 
 // POST /api/uploads — upload a file (evidence, tender doc, bid doc)
-// Phase 2 dev: stores to local filesystem under /home/z/my-project/uploads/{tenantId}/...
-// Phase 2 prod: will use S3-compatible object store with signed URLs.
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const formData = await req.formData()
-  const file = formData.get('file') as File | null
-  const category = (formData.get('category') as string) ?? 'evidence'
-  const evidenceId = formData.get('evidenceId') as string | null
+// Dev: local filesystem under UPLOAD_DIR (default: <cwd>/uploads)/{tenantId}/...
+// Prod: use S3-compatible object store with signed URLs.
 
-  if (!file) {
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('contributor')
+  const formData = await boundedFormData(req)
+  const file = formData.get('file') as File | null
+  const categoryValue = formData.get('category') ?? 'evidence'
+  const uploadDir = getTenantUploadDirectory(UPLOAD_ROOT, ctx.tenantId, categoryValue)
+  const category = categoryValue as string
+  const evidenceId = formData.get('evidenceId')
+  if (evidenceId !== null && typeof evidenceId !== 'string') {
+    return NextResponse.json({ error: 'Invalid evidenceId' }, { status: 400 })
+  }
+  if (evidenceId) {
+    idSchema.parse(evidenceId)
+    const evidence = await db.evidence.findFirst({
+      where: { id: evidenceId, company: { tenantId: ctx.tenantId } }, select: { id: true },
+    })
+    if (!evidence) return NextResponse.json({ error: 'Evidence not found' }, { status: 404 })
+  }
+
+  if (!file || typeof file === 'string') {
     return NextResponse.json({ error: 'No file provided' }, { status: 400 })
   }
 
-  // File-type validation (whitelist)
-  const ALLOWED_TYPES = [
-    'application/pdf',
-    'image/png',
-    'image/jpeg',
-    'image/jpg',
-    'text/plain',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ]
-  const ALLOWED_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.txt', '.docx', '.xlsx']
-
-  const fileName = file.name.toLowerCase()
-  const extOk = ALLOWED_EXTENSIONS.some((ext) => fileName.endsWith(ext))
-  if (!ALLOWED_TYPES.includes(file.type) || !extOk) {
-    return NextResponse.json({
-      error: `File type ${file.type || 'unknown'} not allowed. Allowed: PDF, PNG, JPG, TXT, DOCX, XLSX.`,
-    }, { status: 400 })
-  }
-
-  // Size limit: 25 MB
-  const MAX_SIZE = 25 * 1024 * 1024
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: 'File exceeds 25 MB limit.' }, { status: 400 })
-  }
-
-  // Read file buffer
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
+  const buffer = Buffer.from(await file.arrayBuffer())
+  validateUploadContent(file.name, file.type, buffer)
   const checksum = crypto.createHash('sha256').update(buffer).digest('hex')
   const fileSizeKb = Math.ceil(buffer.length / 1024)
 
-  // Storage path (dev: local FS)
-  const uploadDir = path.join('/home/z/my-project/uploads', ctx.tenantId, category)
+  // Storage path (dev: local FS, env-configurable root)
   await fs.mkdir(uploadDir, { recursive: true })
   const fileId = crypto.randomBytes(8).toString('hex')
   const storedFileName = `${fileId}-${file.name.replace(/[^a-zA-Z0-9.\-]/g, '_')}`
@@ -62,33 +55,24 @@ export async function POST(req: NextRequest) {
 
   const storageKey = `${ctx.tenantId}/${category}/${storedFileName}`
 
-  // Extract text for simple text files (Phase 2: PDF extraction would use pdf-parse)
-  let textExtracted: string | null = null
-  if (file.type === 'text/plain') {
-    textExtracted = buffer.toString('utf-8').slice(0, 64000)
-  } else if (file.type === 'application/pdf') {
-    // Phase 2 dev: placeholder text. Production: use pdf-parse or vision fallback.
-    textExtracted = `[PDF binary — text extraction pending. File: ${file.name}, size: ${fileSizeKb}KB, checksum: ${checksum.slice(0, 16)}...]`
+  let upload
+  try {
+    upload = await db.$transaction(async tx => {
+      const record = await tx.fileUpload.create({
+        data: {
+          tenantId: ctx.tenantId, uploadedById: ctx.userId,
+          fileName: file.name, fileType: file.type, fileSizeKb, checksum,
+          storageKey, storageUrl: filePath, category, evidenceId: evidenceId ?? null,
+          virusScanResult: 'pending', textExtracted: null, textExtractedAt: null,
+        },
+      })
+      await enqueueOutbox(tx, ctx.tenantId, 'upload.scan', { uploadId: record.id })
+      return record
+    })
+  } catch (error) {
+    await fs.unlink(filePath).catch(() => undefined)
+    throw error
   }
-
-  const upload = await db.fileUpload.create({
-    data: {
-      tenantId: ctx.tenantId,
-      uploadedById: ctx.userId,
-      fileName: file.name,
-      fileType: file.type,
-      fileSizeKb,
-      checksum,
-      storageKey,
-      storageUrl: filePath,
-      category,
-      evidenceId: evidenceId ?? null,
-      virusScanResult: 'clean', // Phase 2 dev: skip actual virus scan. Production: ClamAV or S3 scan.
-      textExtracted,
-      textExtractedAt: textExtracted ? new Date() : null,
-    },
-  })
-
   await logAction({
     tenantId: ctx.tenantId,
     userId: ctx.userId,
@@ -108,19 +92,20 @@ export async function POST(req: NextRequest) {
     category,
     evidenceId: upload.evidenceId,
     virusScanResult: upload.virusScanResult,
-    textExtracted: textExtracted?.slice(0, 500),
+    virusScannedAt: upload.virusScannedAt,
+    textExtracted: null,
     createdAt: upload.createdAt,
   }, { status: 201 })
-}
+})
 
 // GET /api/uploads — list uploads for the tenant
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const category = searchParams.get('category')
   const evidenceId = searchParams.get('evidenceId')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.FileUploadWhereInput = { tenantId: ctx.tenantId }
   if (category) where.category = category
   if (evidenceId) where.evidenceId = evidenceId
 
@@ -139,8 +124,9 @@ export async function GET(req: NextRequest) {
       category: u.category,
       evidenceId: u.evidenceId,
       virusScanResult: u.virusScanResult,
-      textExtractedPreview: u.textExtracted?.slice(0, 200) ?? null,
+      virusScannedAt: u.virusScannedAt,
+      textExtractedPreview: u.virusScanResult === 'clean' && u.virusScannedAt ? u.textExtracted?.slice(0, 200) ?? null : null,
       createdAt: u.createdAt,
     })),
   })
-}
+})

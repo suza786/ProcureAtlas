@@ -1,6 +1,11 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+import { formatCurrencyAmount } from '@/lib/financial-calculations'
+
+import { useState } from 'react'
 import { useAppStore } from '@/lib/store'
 import { formatUSD, formatDate, marketColor, sectorColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -13,7 +18,7 @@ import {
   Globe,
   Building2,
 } from 'lucide-react'
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts'
+import { DeferredBarChart } from '@/components/charts/deferred-charts'
 
 interface CompetitorItem {
   id: string
@@ -26,11 +31,13 @@ interface CompetitorItem {
   stats: {
     totalAwards: number
     totalAwardValueUSD: number
-    averageAwardValueUSD: number
+    averageAwardValueUSD: number | null
+    normalizedCount: number
+    unnormalizedCount: number
     sectorsWon: Array<[string, number]>
     topBuyers: Array<[string, number]>
   }
-  recentAwards: Array<{ id: string; tender: { title: string; sector: string; market: string; valueUSD: number | null }; contractValue: number | null; awardedAt: string }>
+  recentAwards: Array<{ id: string; tender: { title: string; sector: string; market: string; valueUSD: number | null }; contractValue: number | null; currency: string; valueUSD: number | null; awardedAt: string }>
 }
 
 interface CompetitorDetail {
@@ -44,7 +51,9 @@ interface CompetitorDetail {
   stats: {
     totalAwards: number
     totalAwardValueUSD: number
-    averageAwardValueUSD: number
+    averageAwardValueUSD: number | null
+    normalizedCount: number
+    unnormalizedCount: number
     firstAwardAt: string | null
     lastAwardAt: string | null
   }
@@ -56,6 +65,7 @@ interface CompetitorDetail {
     id: string
     tender: { id: string; title: string; sector: string; market: string; country: string; valueUSD: number | null; buyer: { organization: { name: string } } | null }
     contractValue: number | null
+    valueUSD: number | null
     currency: string
     awardedAt: string
     contractNo: string | null
@@ -63,27 +73,22 @@ interface CompetitorDetail {
 }
 
 export function CompetitorIntel() {
-  const [items, setItems] = useState<CompetitorItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { t } = useTranslation()
+
   const [search, setSearch] = useState('')
   const openCompetitorDetail = useAppStore((s) => s.openCompetitorDetail)
 
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (search) params.set('search', search)
-    fetch(`/api/competitors?${params.toString()}`)
-      .then(r => r.json())
-      .then(d => { setItems(d.items ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [search])
+  const { data, loading, error, refetch } = useApiQuery<{ items: CompetitorItem[] }>(
+    `/api/competitors?${new URLSearchParams(search ? { search } : {})}`, { debounceMs: 300 }
+  )
+  const items = data?.items ?? []
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Target className="h-6 w-6 text-slate-700" />
-          Competitor Intelligence
-        </h1>
+          {t("Competitor Intelligence")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           Supplier profiles with award history, win rates, sector breakdowns, and buyer relationships.
         </p>
@@ -92,20 +97,23 @@ export function CompetitorIntel() {
       <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2">
         <Search className="h-3.5 w-3.5 text-slate-400 ml-1" />
         <input
-          type="text"
+          type="search"
+          aria-label={t("Search competitors")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search competitors by name or country..."
+          placeholder={t("Search competitors by name or country...")}
           className="flex-1 text-xs outline-none bg-transparent"
         />
         <span className="text-xs text-slate-500">{items.length} suppliers</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {loading ? (
-          <div className="col-span-2 p-8 text-center text-sm text-slate-500">Loading competitors...</div>
+        {error ? (
+          <div role="alert" className="p-8 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+        ) : loading ? (
+          <div className="col-span-2 p-8 text-center text-sm text-slate-500">{t("Loading competitors...")}</div>
         ) : items.length === 0 ? (
-          <div className="col-span-2 p-8 text-center text-sm text-slate-500">No competitors found.</div>
+          <div className="col-span-2 p-8 text-center text-sm text-slate-500">{t("No competitors found.")}</div>
         ) : (
           items.map((c) => (
             <button
@@ -130,15 +138,16 @@ export function CompetitorIntel() {
 
               <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Awards</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Awards")}</p>
                   <p className="text-sm font-semibold text-slate-900">{c.stats.totalAwards}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total Value</p>
-                  <p className="text-sm font-semibold text-slate-900">{formatUSD(c.stats.totalAwardValueUSD)}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Total Value")}</p>
+                  <p className="text-sm font-semibold text-slate-900">{c.stats.normalizedCount ? formatUSD(c.stats.totalAwardValueUSD) : t("Unknown")}</p>
+                  {c.stats.unnormalizedCount > 0 && <p className="text-xs text-slate-500">{c.stats.unnormalizedCount} without FX</p>}
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Avg Value</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Avg Value")}</p>
                   <p className="text-sm font-semibold text-slate-900">{formatUSD(c.stats.averageAwardValueUSD)}</p>
                 </div>
               </div>
@@ -152,7 +161,7 @@ export function CompetitorIntel() {
               </div>
 
               <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Top Buyers</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">{t("Top Buyers")}</p>
                 <div className="space-y-0.5">
                   {c.stats.topBuyers.slice(0, 3).map(([buyer, count]) => (
                     <div key={buyer} className="flex items-center justify-between text-xs">
@@ -171,25 +180,20 @@ export function CompetitorIntel() {
 }
 
 export function CompetitorDetail({ organizationId }: { organizationId: string }) {
-  const [data, setData] = useState<CompetitorDetail | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { t, formatDate } = useTranslation()
+
   const goCompetitorIntel = useAppStore((s) => s.goCompetitorIntel)
 
-  useEffect(() => {
-    fetch(`/api/competitors/${organizationId}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [organizationId])
+  const { data, loading, error, refetch } = useApiQuery<CompetitorDetail>(`/api/competitors/${organizationId}`)
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading competitor profile...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Competitor not found.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading competitor profile...")}</div>
+  if (error) return <div role="alert" className="p-6 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Competitor not found.")}</div>
 
   return (
     <div className="space-y-4">
       <button onClick={goCompetitorIntel} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900">
-        <ArrowRight className="h-3.5 w-3.5 rotate-180" /> Back to Competitors
-      </button>
+        <ArrowRight className="h-3.5 w-3.5 rotate-180" /> {t("Back to Competitors")}</button>
 
       <div className="flex items-start justify-between">
         <div>
@@ -207,25 +211,18 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatTile icon={Award} label="Total Awards" value={data.stats.totalAwards.toString()} tone="emerald" />
-        <StatTile icon={TrendingUp} label="Total Value" value={formatUSD(data.stats.totalAwardValueUSD)} tone="violet" />
-        <StatTile icon={TrendingUp} label="Avg Value" value={formatUSD(data.stats.averageAwardValueUSD)} tone="sky" />
-        <StatTile icon={Building2} label="Active Since" value={data.stats.firstAwardAt ? formatDate(data.stats.firstAwardAt) : '—'} tone="amber" />
+        <StatTile icon={Award} label={t("Total Awards")} value={data.stats.totalAwards.toString()} tone="emerald" />
+        <StatTile icon={TrendingUp} label={t("Total Value")} value={data.stats.normalizedCount ? formatUSD(data.stats.totalAwardValueUSD) : t("Unknown")} tone="violet" />
+        <StatTile icon={TrendingUp} label={t("Avg Value")} value={formatUSD(data.stats.averageAwardValueUSD)} tone="sky" />
+        <StatTile icon={Building2} label={t("Active Since")} value={data.stats.firstAwardAt ? formatDate(data.stats.firstAwardAt) : '—'} tone="amber" />
       </div>
 
       {/* Win trend chart */}
       {data.winTrend.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Win Trend by Year</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Win Trend by Year")}</h2>
           <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.winTrend.map(t => ({ year: t.year, awards: t.count, value: Math.round(t.totalValue / 1000) }))}>
-                <XAxis dataKey="year" tick={{ fontSize: 11 }} stroke="#64748b" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                <Bar dataKey="awards" fill="#0f172a" radius={[4, 4, 0, 0]} name="Awards" />
-              </BarChart>
-            </ResponsiveContainer>
+            <DeferredBarChart label={t("Win Trend by Year")} data={data.winTrend.map(item => ({ year: item.year, awards: item.count, value: Math.round(item.totalValue / 1000) }))} xKey="year" series={[{ key: "awards", label: t("Awards"), color: "#0f172a" }]} />
           </div>
         </div>
       )}
@@ -236,8 +233,7 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
           <div className="border-b border-slate-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-sky-600" />
-              Top Buyers
-            </h2>
+              {t("Top Buyers")}</h2>
           </div>
           <div className="divide-y divide-slate-100">
             {data.topBuyers.map((b, i) => (
@@ -257,8 +253,7 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
           <div className="border-b border-slate-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Globe className="h-4 w-4 text-violet-600" />
-              Sector Breakdown
-            </h2>
+              {t("Sector Breakdown")}</h2>
           </div>
           <div className="divide-y divide-slate-100">
             {data.sectorBreakdown.map((s) => (
@@ -283,11 +278,11 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tender</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Buyer</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Market</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Value</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Awarded</th>
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Tender")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Buyer")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Market")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Value")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Awarded")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -300,7 +295,7 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
                       {a.tender.market}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{formatUSD(a.contractValue)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{a.valueUSD == null ? 'Unknown USD value' : formatUSD(a.valueUSD)}<p className="text-xs font-normal text-slate-500">{formatCurrencyAmount(a.contractValue, a.currency)}</p></td>
                   <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(a.awardedAt)}</td>
                 </tr>
               ))}

@@ -1,13 +1,15 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { parseIds } from '@/lib/api-validation'
 import { NextResponse } from 'next/server'
 import { getCurrentTenant } from '@/lib/tenant'
 import { computeTenderMatchForTenant } from '@/lib/matching'
 
 // GET /api/match/tender/[tenderId] — semantic match score for a tender vs tenant's company
-export async function GET(
+export const GET = withApiErrors(async function GET(
   _req: Request,
   { params }: { params: Promise<{ tenderId: string }> }
 ) {
-  const { tenderId } = await params
+  const { tenderId } = parseIds(await params)
   const ctx = await getCurrentTenant()
 
   const match = await computeTenderMatchForTenant(tenderId, ctx.tenantId)
@@ -22,4 +24,4 @@ export async function GET(
     engine: 'deterministic-v1 (pgvector-ready)',
     note: 'Phase 3 uses deterministic tag+keyword+capability matching. Production with PostgreSQL pgvector will use cosine similarity over embeddings.',
   })
-}
+})

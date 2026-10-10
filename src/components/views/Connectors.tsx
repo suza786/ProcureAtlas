@@ -1,4 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -38,13 +42,15 @@ interface ConnectorInfo {
 }
 
 export function Connectors() {
+  const { t, formatDateTime } = useTranslation()
+
   const [connectors, setConnectors] = useState<ConnectorInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState<string | null>(null)
   const [lastResult, setLastResult] = useState<{ source: string; result: unknown } | null>(null)
 
   const load = () => {
-    fetch('/api/connectors')
+    apiFetch('/api/connectors')
       .then(r => r.json())
       .then(d => { setConnectors(d.connectors ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -56,7 +62,7 @@ export function Connectors() {
     setRunning(sourceCode)
     setLastResult(null)
     try {
-      const res = await fetch('/api/connectors', {
+      const res = await apiFetch('/api/connectors', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sourceCode, runType: 'manual', limit: 10 }),
@@ -64,7 +70,7 @@ export function Connectors() {
       const data = await res.json()
       setLastResult({ source: sourceCode, result: data })
       load() // refresh runs
-    } finally {
+    } catch { /* Shared API notice displays the failure. */ } finally {
       setRunning(null)
     }
   }
@@ -75,8 +81,7 @@ export function Connectors() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Globe className="h-6 w-6 text-slate-700" />
-          Data Source Connectors
-        </h1>
+          {t("Data Source Connectors")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           Per-source ingestion with audit-logged runs. Live fetching requires legal sign-off per <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">DATA_SOURCE_LEGAL_REGISTER.md</code>.
         </p>
@@ -85,7 +90,7 @@ export function Connectors() {
       {/* Last run result */}
       {lastResult && (
         <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
-          <p className="font-semibold text-slate-700 mb-1">Last run: {lastResult.source}</p>
+          <p className="font-semibold text-slate-700 mb-1">{t("Last run:")}{' '}{lastResult.source}</p>
           <pre className="bg-slate-900 text-slate-100 p-2 rounded text-[10px] overflow-x-auto">
             {JSON.stringify(lastResult.result, null, 2)}
           </pre>
@@ -94,7 +99,7 @@ export function Connectors() {
 
       {/* Connectors grid */}
       {loading ? (
-        <div className="p-8 text-center text-sm text-slate-500">Loading connectors...</div>
+        <div className="p-8 text-center text-sm text-slate-500">{t("Loading connectors...")}</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {connectors.map((c) => (
@@ -153,7 +158,7 @@ export function Connectors() {
               {/* Recent runs */}
               {c.recentRuns.length > 0 && (
                 <div className="border-t border-slate-100 pt-2">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">Recent runs</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1.5">{t("Recent runs")}</p>
                   <div className="space-y-1 max-h-32 overflow-y-auto">
                     {c.recentRuns.slice(0, 5).map((r) => (
                       <div key={r.id} className="flex items-center gap-2 text-[10px]">

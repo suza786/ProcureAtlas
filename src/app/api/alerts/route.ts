@@ -1,9 +1,10 @@
+import { withApiErrors } from '@/lib/api-errors'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/alerts — active alerts for the current tenant
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
   if (!ctx.tenantId) return NextResponse.json({ items: [] })
 
@@ -29,4 +30,4 @@ export async function GET() {
       tender: a.tender,
     })),
   })
-}
+})

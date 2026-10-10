@@ -1,10 +1,16 @@
+import { validatedSearch } from '@/lib/api-validation'
+import type { Prisma } from '@prisma/client'
+import { pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 
 // GET /api/v1/awards — public API: search awards
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -16,18 +22,16 @@ export async function GET(req: NextRequest) {
     return res
   }
 
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const market = searchParams.get('market')
   const sector = searchParams.get('sector')
   const supplierOrgId = searchParams.get('supplierOrgId')
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
-  const offset = parseInt(searchParams.get('offset') ?? '0', 10)
+  const { limit } = pagination(searchParams, 20, 100)
+  const { offset } = pagination(searchParams)
 
-  const where: Record<string, unknown> = {}
+  const where: Prisma.AwardWhereInput = {}
   if (market || sector) {
-    where.tender = {}
-    if (market) where.tender.market = market
-    if (sector) where.tender.sector = sector
+    where.tender = { ...(market ? { market } : {}), ...(sector ? { sector } : {}) }
   }
   if (supplierOrgId) where.supplierOrgId = supplierOrgId
 
@@ -48,4 +52,4 @@ export async function GET(req: NextRequest) {
   const res = NextResponse.json({ total, limit, offset, count: items.length, items })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})

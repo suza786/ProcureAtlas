@@ -1,15 +1,21 @@
+import { calculateBidPrice, compareBidToTenderUSD } from '@/lib/financial-calculations'
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
 
 // GET /api/bid-cost-estimates — list bid cost estimates
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const pursuitId = searchParams.get('pursuitId')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.BidCostEstimateWhereInput = { tenantId: ctx.tenantId }
   if (pursuitId) where.pursuitId = pursuitId
 
   const estimates = await db.bidCostEstimate.findMany({
@@ -22,31 +28,22 @@ export async function GET(req: NextRequest) {
     orderBy: { updatedAt: 'desc' },
   })
 
-  return NextResponse.json({ items: estimates })
-}
+  const rates = await db.currencyRate.findMany({ where: { tenantId: ctx.tenantId } })
+  return NextResponse.json({ items: estimates.map(e => {
+    const comparison = compareBidToTenderUSD(e.proposedPrice, e.currency, e.pursuit.tender.valueUSD, rates, ctx.tenantId, e.createdAt)
+    return { ...e, proposedPriceUSD: comparison.proposedPriceUSD, tenderValuePct: comparison.percentage, fxExplanation: comparison.explanation, actualMarginPct: e.proposedPrice > 0 ? e.profitAmount / e.proposedPrice * 100 : null, markupPct: e.totalCost > 0 ? e.profitAmount / e.totalCost * 100 : null }
+  }) })
+})
 
 // POST /api/bid-cost-estimates — create a bid cost estimate
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('contributor')
+  const body = await readJson(req, 'cost')
   const {
     pursuitId, label, currency,
     laborCost, materialsCost, subcontractorCost, overheadCost, travelCost,
     contingencyPct, marginPct, notes, hedgingNotes,
-  } = body as {
-    pursuitId: string
-    label: string
-    currency?: string
-    laborCost?: number
-    materialsCost?: number
-    subcontractorCost?: number
-    overheadCost?: number
-    travelCost?: number
-    contingencyPct?: number
-    marginPct?: number
-    notes?: string
-    hedgingNotes?: string
-  }
+  } = body
 
   if (!pursuitId || !label) {
     return NextResponse.json({ error: 'pursuitId and label required' }, { status: 400 })
@@ -65,14 +62,7 @@ export async function POST(req: NextRequest) {
   const subcontractor = subcontractorCost ?? 0
   const overhead = overheadCost ?? 0
   const travel = travelCost ?? 0
-  const contPct = (contingencyPct ?? 10) / 100
-  const margPct = (marginPct ?? 20) / 100
-
-  const subtotal = labor + materials + subcontractor + overhead + travel
-  const contingency = subtotal * contPct
-  const totalCost = subtotal + contingency
-  const profitAmount = totalCost * margPct
-  const proposedPrice = totalCost + profitAmount
+  const { totalCost, proposedPrice, profitAmount } = calculateBidPrice([labor, materials, subcontractor, overhead, travel], contingencyPct ?? 10, marginPct ?? 20)
 
   const estimate = await db.bidCostEstimate.create({
     data: {
@@ -107,4 +97,4 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(estimate, { status: 201 })
-}
+})

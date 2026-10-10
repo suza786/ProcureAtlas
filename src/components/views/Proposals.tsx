@@ -1,6 +1,12 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { apiFetch } from '@/lib/api-client'
+import { WorkflowDialog } from '@/components/ui/workflow-dialog'
+
+import { useEffect, useState, useRef } from 'react'
+import { SaveQueue } from '@/lib/proposal-save-queue'
 import { useAppStore } from '@/lib/store'
 import { formatDate, formatUSD } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -14,6 +20,10 @@ import {
   Loader2,
 } from 'lucide-react'
 
+interface ProposalSectionSummary {
+  id: string; status: string; sectionType: string; title: string; wordCount: number; evidenceCount: number; hasGaps: boolean
+}
+interface ProposalSectionDetail extends ProposalSectionSummary { order: number; content: string | null; revision: number }
 interface ProposalItem {
   id: string
   title: string
@@ -32,9 +42,14 @@ interface ProposalItem {
     stage: string
     tender: { title: string; market: string; sector: string; submissionDeadline: string | null; valueUSD: number | null }
   }
-  sections: Array<{ id: string; status: string; sectionType: string; title: string; wordCount: number; evidenceCount: number; hasGaps: boolean }>
+  sections: ProposalSectionSummary[]
   versionCount: number
   approvalCount: number
+}
+
+interface ProposalDetail extends Omit<ProposalItem, 'sections' | 'versionCount' | 'approvalCount'> {
+  sections: ProposalSectionDetail[]
+  revision: number
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -46,6 +61,8 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 export function Proposals() {
+  const { t, formatDate } = useTranslation()
+
   const [items, setItems] = useState<ProposalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -53,7 +70,7 @@ export function Proposals() {
   const goPursuits = useAppStore((s) => s.goPursuits)
 
   const load = () => {
-    fetch('/api/proposals')
+    apiFetch('/api/proposals')
       .then(r => r.json())
       .then(d => { setItems(d.items ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -67,8 +84,7 @@ export function Proposals() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <FileText className="h-6 w-6 text-slate-700" />
-            Proposal Studio
-          </h1>
+            {t("Proposal Studio")}</h1>
           <p className="text-sm text-slate-500 mt-1">
             AI-assisted proposal drafting grounded in approved evidence. Every section links to evidence or flags gaps.
           </p>
@@ -77,8 +93,7 @@ export function Proposals() {
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
         >
-          <Plus className="h-3.5 w-3.5" /> New Proposal
-        </button>
+          <Plus className="h-3.5 w-3.5" /> {t("New Proposal")}</button>
       </div>
 
       {/* Create modal */}
@@ -87,12 +102,12 @@ export function Proposals() {
       {/* Proposal list */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading proposals...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading proposals...")}</div>
         ) : items.length === 0 ? (
           <div className="p-8 text-center">
             <FileText className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500 mb-2">No proposals yet.</p>
-            <p className="text-xs text-slate-400">Create a proposal from any pursuit in the bidding stage.</p>
+            <p className="text-sm text-slate-500 mb-2">{t("No proposals yet.")}</p>
+            <p className="text-xs text-slate-400">{t("Create a proposal from any pursuit in the bidding stage.")}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -130,6 +145,8 @@ export function Proposals() {
 }
 
 function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
+  const { t } = useTranslation()
+
   const [pursuits, setPursuits] = useState<Array<{ id: string; stage: string; tender: { title: string; market: string } }>>([])
   const [selectedPursuitId, setSelectedPursuitId] = useState('')
   const [title, setTitle] = useState('')
@@ -137,12 +154,13 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/pursuits')
+    apiFetch('/api/pursuits')
       .then(r => r.json())
       .then(d => {
         const bidding = (d.items ?? []).filter((p: { stage: string }) => ['bidding', 'qualifying'].includes(p.stage))
         setPursuits(bidding)
       })
+      .catch(cause => setError(cause.message))
   }, [])
 
   const create = async () => {
@@ -153,7 +171,7 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
     setCreating(true)
     setError(null)
     try {
-      const res = await fetch('/api/proposals', {
+      const res = await apiFetch('/api/proposals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pursuitId: selectedPursuitId, title }),
@@ -172,29 +190,29 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-lg bg-white p-6" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">Create Proposal</h2>
+    <WorkflowDialog title={t("Create Proposal")} description="Choose a pursuit and enter a title to start your proposal." onClose={onClose} busy={creating}>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Pursuit</label>
+            <label htmlFor="proposal-pursuit" className="block text-xs font-medium text-slate-700 mb-1">{t("Pursuit")}</label>
             <select
+              id="proposal-pursuit"
               value={selectedPursuitId}
               onChange={e => setSelectedPursuitId(e.target.value)}
               className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 bg-white"
             >
-              <option value="">Select a pursuit...</option>
+              <option value="">{t("Select a pursuit...")}</option>
               {pursuits.map(p => (
                 <option key={p.id} value={p.id}>{p.tender.title} ({p.stage})</option>
               ))}
             </select>
             {pursuits.length === 0 && (
-              <p className="text-[10px] text-slate-500 mt-1">No pursuits in bidding stage. Create one from Pursuits.</p>
+              <p className="text-[10px] text-slate-500 mt-1">{t("No pursuits in bidding stage. Create one from Pursuits.")}</p>
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Proposal Title</label>
+            <label htmlFor="proposal-title" className="block text-xs font-medium text-slate-700 mb-1">{t("Proposal Title")}</label>
             <input
+              id="proposal-title"
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
@@ -202,7 +220,7 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
               className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
             />
           </div>
-          {error && <p className="text-xs text-rose-700">{error}</p>}
+          {error && <p role="alert" className="text-xs text-rose-700">{error}</p>}
           <div className="flex gap-2 pt-2">
             <button
               onClick={create}
@@ -210,13 +228,11 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
               className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Create with 9 default sections
-            </button>
-            <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">Cancel</button>
+              {t("Create with 9 default sections")}</button>
+            <button disabled={creating} onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">{t("Cancel")}</button>
           </div>
         </div>
-      </div>
-    </div>
+    </WorkflowDialog>
   )
 }
 
@@ -225,77 +241,157 @@ function CreateProposalModal({ onClose, onCreated }: { onClose: () => void; onCr
 // ============================================================
 
 export function ProposalEditor({ proposalId }: { proposalId: string }) {
-  const [proposal, setProposal] = useState<ProposalItem | null>(null)
+  const { t } = useTranslation()
+
+  const [proposal, setProposal] = useState<ProposalDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeSectionId, setActiveSectionId] = useState<string | null>(null)
   const [drafting, setDrafting] = useState(false)
   const [draftResult, setDraftResult] = useState<{ success: boolean; content?: string; evidenceUsed?: Array<{ evidenceId: string; title: string; snippet: string }>; gaps?: string[]; error?: string; note?: string } | null>(null)
   const goProposals = useAppStore((s) => s.goProposals)
+  const auth = useAppStore(s => s.auth)
+  const canReview = auth.authenticated && ['manager','admin','owner'].includes(auth.user?.role ?? '')
 
-  const load = () => {
-    fetch(`/api/proposals/${proposalId}`)
-      .then(r => r.json())
-      .then(d => {
-        setProposal(d)
-        if (!activeSectionId && d.sections?.length > 0) {
-          setActiveSectionId(d.sections[0].id)
-        }
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }
-
-  useEffect(() => { load() }, [proposalId])
-
-  const saveSection = async (sectionId: string, content: string) => {
-    await fetch(`/api/proposals/${proposalId}/sections/${sectionId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content, status: 'drafting' }),
-    })
-    load()
-  }
-
-  const draftSection = async (sectionId: string) => {
-    setDrafting(true)
-    setDraftResult(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [pendingSaves, setPendingSaves] = useState(0)
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
+  const dirty = useRef<Record<string, string>>({})
+  const current = useRef<ProposalDetail | null>(null)
+  const queue = useRef(new SaveQueue())
+  const operation = useRef(false)
+  const generation = useRef(0)
+  const load = async () => {
+    const requestGeneration = generation.current
     try {
-      const res = await fetch(`/api/proposals/${proposalId}/draft-section`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sectionId }),
+      const response = await apiFetch('/api/proposals/' + proposalId)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? 'Could not load proposal')
+      if (generation.current !== requestGeneration) return
+      current.current = data; setProposal(data)
+      setActiveSectionId(previous => previous ?? data.sections?.[0]?.id ?? null)
+    } catch (error) { if (generation.current === requestGeneration) setSaveError((error as Error).message) }
+    finally { if (generation.current === requestGeneration) setLoading(false) }
+  }
+  useEffect(() => {
+    generation.current++; current.current = null; dirty.current = {}; setDrafts({}); queue.current = new SaveQueue(); setProposal(null); setActiveSectionId(null); setDraftResult(null); setSaveError(null); setPendingSaves(0); operation.current = false; setDrafting(false); setLoading(true)
+    void load()
+    return () => { generation.current++ }
+  }, [proposalId])
+
+  const saveSection = async (sectionId: string, content: string, status = 'drafting') => {
+    const editorGeneration = generation.current
+    setPendingSaves(count => count + 1)
+    try {
+      return await queue.current.enqueue(async () => {
+        if (generation.current !== editorGeneration) return
+        const section = current.current?.sections.find(row => row.id === sectionId)
+        if (!section) throw new Error('Section is no longer available')
+        if (status === 'drafting' && section.content === content) {
+          if (dirty.current[sectionId] === content) {
+            delete dirty.current[sectionId]
+            setDrafts(previous => { const next = { ...previous }; delete next[sectionId]; return next })
+          }
+          return
+        }
+        const response = await apiFetch('/api/proposals/' + proposalId + '/sections/' + sectionId, {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, status, expectedRevision: section.revision }),
+        })
+        const updated = await response.json()
+        if (!response.ok) throw new Error(updated.error ?? 'Save failed')
+        if (generation.current !== editorGeneration) return
+        if (current.current) {
+          current.current = { ...current.current, ...updated.proposal, revision: updated.proposalRevision, sections: current.current.sections.map(row => row.id === sectionId ? updated : row) }
+          setProposal(current.current)
+        }
+        if (dirty.current[sectionId] === content) {
+          delete dirty.current[sectionId]
+          setDrafts(previous => { const next = { ...previous }; delete next[sectionId]; return next })
+        }
+        setSaveError(null)
       })
-      const data = await res.json()
+    } catch (error) { if (generation.current === editorGeneration) setSaveError((error as Error).message); throw error }
+    finally { if (generation.current === editorGeneration) setPendingSaves(count => Math.max(0, count - 1)) }
+  }
+  const flushSaves = async () => {
+    for (const [sectionId, content] of Object.entries(dirty.current)) await saveSection(sectionId, content)
+    await queue.current.flush()
+  }
+  const draftSection = async (sectionId: string) => {
+    if (operation.current) return
+    const operationGeneration = generation.current
+    operation.current = true; setDrafting(true); setDraftResult(null)
+    try {
+      await flushSaves()
+      if (generation.current !== operationGeneration) return
+      const section = current.current?.sections.find(row => row.id === sectionId)
+      const response = await apiFetch('/api/proposals/' + proposalId + '/draft-section', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sectionId, expectedRevision: section?.revision }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? 'Draft failed')
+      if (generation.current !== operationGeneration) return
       setDraftResult(data)
-      if (data.success) load()
-    } catch (e) {
-      setDraftResult({ success: false, error: (e as Error).message })
-    } finally {
-      setDrafting(false)
-    }
+      if (data.success) await load()
+    } catch (error) { if (generation.current === operationGeneration) setDraftResult({ success: false, error: (error as Error).message }) }
+    finally { if (generation.current === operationGeneration) { operation.current = false; setDrafting(false) } }
   }
-
   const createVersion = async () => {
-    const summary = prompt('Version change summary:', `Version ${(proposal?.currentVersion ?? 0) + 1}`)
+    if (operation.current) return
+    const summary = prompt('Version change summary:', 'New version')
     if (!summary) return
-    await fetch(`/api/proposals/${proposalId}/versions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ changeSummary: summary }),
-    })
-    load()
+    const operationGeneration = generation.current
+    operation.current = true; setDrafting(true)
+    try {
+      await flushSaves()
+      if (generation.current !== operationGeneration) return
+      const response = await apiFetch('/api/proposals/' + proposalId + '/versions', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changeSummary: summary, expectedRevision: current.current?.revision }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? 'Could not save version')
+      if (generation.current === operationGeneration) await load()
+    } catch (error) { if (generation.current === operationGeneration) setSaveError((error as Error).message) }
+    finally { if (generation.current === operationGeneration) { operation.current = false; setDrafting(false) } }
+  }
+  const reviewSection = async (sectionId: string) => {
+    if (operation.current) return
+    const operationGeneration = generation.current
+    operation.current = true; setDrafting(true)
+    try { await flushSaves(); if (generation.current !== operationGeneration) return; await saveSection(sectionId, current.current?.sections.find(row => row.id === sectionId)?.content ?? '', 'approved'); if (generation.current === operationGeneration) await load() }
+    catch (error) { if (generation.current === operationGeneration) setSaveError((error as Error).message) }
+    finally { if (generation.current === operationGeneration) { operation.current = false; setDrafting(false) } }
   }
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading proposal...</div>
-  if (!proposal) return <div className="p-6 text-sm text-rose-600">Proposal not found.</div>
+  const updateStatus = async (status: 'in_review' | 'submitted') => {
+    if (operation.current) return
+    const operationGeneration = generation.current
+    operation.current = true; setDrafting(true)
+    try {
+      await flushSaves()
+      if (generation.current !== operationGeneration) return
+      const response = await apiFetch('/api/proposals/' + proposalId, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, expectedRevision: current.current?.revision }),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error ?? 'Could not update proposal')
+      if (generation.current === operationGeneration) await load()
+    } catch (error) { if (generation.current === operationGeneration) setSaveError((error as Error).message) }
+    finally { if (generation.current === operationGeneration) { operation.current = false; setDrafting(false) } }
+  }
+
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading proposal...")}</div>
+  if (!proposal) return <div className="p-6 text-sm text-rose-600">{t("Proposal not found.")}</div>
 
   const activeSection = proposal.sections?.find((s: { id: string }) => s.id === activeSectionId)
 
   return (
     <div className="space-y-4">
       <button onClick={goProposals} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900">
-        <ArrowRight className="h-3.5 w-3.5 rotate-180" /> Back to Proposals
-      </button>
+        <ArrowRight className="h-3.5 w-3.5 rotate-180" /> {t("Back to Proposals")}</button>
 
       <div className="flex items-start justify-between">
         <div>
@@ -310,16 +406,22 @@ export function ProposalEditor({ proposalId }: { proposalId: string }) {
         </div>
         <button
           onClick={createVersion}
+          disabled={drafting}
           className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
-          Save Version
-        </button>
+          {t("Save Version")}</button>
+        {proposal.status === 'draft' && <button disabled={drafting} onClick={() => { void updateStatus('in_review') }} className="rounded border px-3 py-1 text-xs disabled:opacity-50">{t("Send for review")}</button>}
+        {canReview && proposal.status === 'approved' && <button disabled={drafting} onClick={() => { void updateStatus('submitted') }} className="rounded bg-slate-900 px-3 py-1 text-xs text-white disabled:opacity-50">{t("Record submission")}</button>}
       </div>
 
+      <div role="status" aria-live="polite" className="text-xs text-slate-600">
+        {pendingSaves > 0 ? t("Saving changes...") : Object.keys(drafts).length ? t("Unsaved changes") : t("Changes saved")}
+        {saveError && <p role="alert" className="text-rose-700">{saveError} <button className="underline" onClick={() => { void flushSaves().catch(() => {}) }}>{t("Retry save")}</button> · <button className="underline" onClick={() => { void load() }}>{t("Reload latest (keeps local edits)")}</button></p>}
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
         {/* Section sidebar */}
         <div className="rounded-lg border border-slate-200 bg-white p-2 max-h-[600px] overflow-y-auto">
-          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-2 py-1">Sections</p>
+          <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold px-2 py-1">{t("Sections")}</p>
           {proposal.sections?.map((s: { id: string; order: number; title: string; status: string; sectionType: string; wordCount: number; evidenceCount: number; hasGaps: boolean }) => (
             <button
               key={s.id}
@@ -357,11 +459,11 @@ export function ProposalEditor({ proposalId }: { proposalId: string }) {
                 </div>
                 <button
                   onClick={() => draftSection(activeSection.id)}
-                  disabled={drafting}
+                  disabled={drafting || ['submitted','withdrawn'].includes(proposal.status)}
                   className="flex items-center gap-1.5 rounded-md border border-violet-500/30 bg-violet-500/10 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-500/20 disabled:opacity-50"
                 >
                   {drafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                  {drafting ? 'Drafting...' : 'AI Draft'}
+                  {drafting ? t("Drafting...") : t("AI Draft")}
                 </button>
               </div>
 
@@ -371,13 +473,13 @@ export function ProposalEditor({ proposalId }: { proposalId: string }) {
                   draftResult.success ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/30 bg-rose-500/5'
                 )}>
                   <p className={cn('font-medium', draftResult.success ? 'text-emerald-800' : 'text-rose-800')}>
-                    {draftResult.success ? `Draft generated — ${draftResult.evidenceUsed?.length ?? 0} evidence cited, ${draftResult.gaps?.length ?? 0} gaps flagged` : 'Draft failed'}
+                    {draftResult.success ? `Draft generated — ${draftResult.evidenceUsed?.length ?? 0} evidence cited, ${draftResult.gaps?.length ?? 0} gaps flagged` : t("Draft failed")}
                   </p>
                   {draftResult.error && <p className="text-rose-700 mt-1">{draftResult.error}</p>}
                   {draftResult.note && <p className="text-slate-600 mt-1">{draftResult.note}</p>}
                   {draftResult.gaps && draftResult.gaps.length > 0 && (
                     <div className="mt-2">
-                      <p className="font-medium text-amber-800 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> Evidence Gaps:</p>
+                      <p className="font-medium text-amber-800 flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {' '}{t("Evidence Gaps:")}</p>
                       <ul className="mt-1 space-y-0.5 text-amber-700">
                         {draftResult.gaps.map((g, i) => <li key={i}>• {g}</li>)}
                       </ul>
@@ -387,14 +489,17 @@ export function ProposalEditor({ proposalId }: { proposalId: string }) {
               )}
 
               <textarea
-                key={activeSection.id + (draftResult?.content ?? '')}
-                defaultValue={activeSection.content ?? draftResult?.content ?? ''}
-                onBlur={(e) => saveSection(activeSection.id, e.target.value)}
-                placeholder="Draft this section... Use the AI Draft button for evidence-grounded assistance."
+                aria-label={activeSection.title}
+                disabled={drafting || ['submitted','withdrawn'].includes(proposal.status)}
+                value={drafts[activeSection.id] ?? activeSection.content ?? ''}
+                onChange={event => { dirty.current[activeSection.id] = event.target.value; setDrafts(previous => ({ ...previous, [activeSection.id]: event.target.value })) }}
+                onBlur={event => { if (dirty.current[activeSection.id] !== undefined) void saveSection(activeSection.id, event.target.value).catch(() => {}) }}
+                placeholder={t("Draft this section... Use the AI Draft button for evidence-grounded assistance.")}
                 className="w-full min-h-[400px] text-sm border border-slate-200 rounded-md p-3 outline-none focus:border-slate-400 font-mono"
               />
 
-              <p className="text-[10px] text-slate-400">Content auto-saves on blur. Use AI Draft for evidence-grounded assistance.</p>
+              {canReview && <button disabled={drafting || ['submitted','withdrawn'].includes(proposal.status)} onClick={() => { void reviewSection(activeSection.id) }} className="rounded border px-3 py-1 text-xs disabled:opacity-50">{t("Approve reviewed section")}</button>}
+              <p className="text-[10px] text-slate-400">{t("Content auto-saves on blur. Use AI Draft for evidence-grounded assistance.")}</p>
             </div>
           )}
         </div>

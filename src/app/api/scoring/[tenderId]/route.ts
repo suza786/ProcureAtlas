@@ -1,3 +1,5 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { parseIds } from '@/lib/api-validation'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
@@ -8,11 +10,11 @@ import {
 } from '@/lib/scoring'
 
 // GET /api/scoring/[tenderId] — deterministic scores for a tender + tenant's company
-export async function GET(
+export const GET = withApiErrors(async function GET(
   _req: Request,
   { params }: { params: Promise<{ tenderId: string }> }
 ) {
-  const { tenderId } = await params
+  const { tenderId } = parseIds(await params)
   const ctx = await getCurrentTenant()
   if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
@@ -35,7 +37,7 @@ export async function GET(
     computeOpportunityFitScore(tenderId, company.id),
   ])
 
-  let submissionReadiness = null
+  let submissionReadiness: Awaited<ReturnType<typeof computeSubmissionReadinessScore>> | null = null
   if (pursuit) {
     submissionReadiness = await computeSubmissionReadinessScore(pursuit.id)
   }
@@ -51,4 +53,4 @@ export async function GET(
     engine: 'deterministic-v1',
     note: 'All scores are deterministic and explainable. LLM features are scaffolded in Phase 1 and not invoked for scoring.',
   })
-}
+})

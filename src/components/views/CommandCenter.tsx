@@ -1,5 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
+
+import { apiFetch } from '@/lib/api-client'
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
@@ -22,18 +25,7 @@ import {
   Activity,
   ArrowRight,
 } from 'lucide-react'
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-} from 'recharts'
+import { DeferredBarChart, DeferredDonutChart } from '@/components/charts/deferred-charts'
 
 interface DashboardData {
   tenant: { name: string; plan: string; region: string }
@@ -94,6 +86,8 @@ const STAGE_COLORS: Record<string, string> = {
 }
 
 export function CommandCenter() {
+  const { t, formatDateTime, formatDate } = useTranslation()
+
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -104,7 +98,7 @@ export function CommandCenter() {
 
   useEffect(() => {
     let cancelled = false
-    fetch('/api/dashboard')
+    apiFetch('/api/dashboard')
       .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed')))
       .then(d => { if (!cancelled) { setData(d); setLoading(false) } })
       .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
@@ -115,7 +109,7 @@ export function CommandCenter() {
   if (error || !data) {
     return (
       <div className="p-6 text-sm text-rose-700">
-        Failed to load dashboard: {error}
+        {t("Failed to load dashboard:")}{error}
       </div>
     )
   }
@@ -138,7 +132,7 @@ export function CommandCenter() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Command Center</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("Command Center")}</h1>
         <p className="text-sm text-slate-500">
           {data.tenant.name} · {data.tenant.plan} plan · {data.company?.name ?? 'No company profile'}
         </p>
@@ -147,7 +141,7 @@ export function CommandCenter() {
       {/* KPI tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <KpiTile
-          label="Active Tenders"
+          label={t("Active Tenders")}
           value={data.kpis.activeTenderCount.toString()}
           icon={Activity}
           tone="emerald"
@@ -155,7 +149,7 @@ export function CommandCenter() {
           onClick={goDiscover}
         />
         <KpiTile
-          label="Active Pursuits"
+          label={t("Active Pursuits")}
           value={data.kpis.activePursuits.toString()}
           icon={Target}
           tone="sky"
@@ -163,35 +157,35 @@ export function CommandCenter() {
           onClick={goPursuits}
         />
         <KpiTile
-          label="Pipeline Value"
+          label={t("Pipeline Value")}
           value={formatUSD(data.kpis.totalPipelineValue)}
           icon={TrendingUp}
           tone="violet"
           subtitle="Estimated"
         />
         <KpiTile
-          label="Win Rate"
+          label={t("Win Rate")}
           value={`${data.kpis.winRate}%`}
           icon={Trophy}
           tone="emerald"
           subtitle={`${data.kpis.wonCount}W / ${data.kpis.lostCount}L`}
         />
         <KpiTile
-          label="Critical Alerts"
+          label={t("Critical Alerts")}
           value={data.kpis.criticalAlerts.toString()}
           icon={AlertTriangle}
           tone="rose"
           subtitle="Needs attention"
         />
         <KpiTile
-          label="Deadlines (7d)"
+          label={t("Deadlines (7d)")}
           value={data.deadlinesThisWeek.length.toString()}
           icon={Clock}
           tone="amber"
           subtitle="This week"
         />
         <KpiTile
-          label="Recent Awards"
+          label={t("Recent Awards")}
           value={data.recentAwards.length.toString()}
           icon={Gavel}
           tone="slate"
@@ -204,16 +198,15 @@ export function CommandCenter() {
         {/* Deadlines this week */}
         <div className="lg:col-span-2 rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Deadlines — Next 7 Days</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Deadlines — Next 7 Days")}</h2>
             <button onClick={goDiscover} className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1">
-              View all <ArrowRight className="h-3 w-3" />
+              {t("View all")}<ArrowRight className="h-3 w-3" />
             </button>
           </div>
           <div className="divide-y divide-slate-100">
             {data.deadlinesThisWeek.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-slate-500">
-                No deadlines in the next 7 days.
-              </div>
+                {t("No deadlines in the next 7 days.")}</div>
             ) : (
               data.deadlinesThisWeek.map((d) => {
                 const urgency = deadlineUrgency(d.submissionDeadline)
@@ -230,7 +223,7 @@ export function CommandCenter() {
                       'bg-slate-100 text-slate-700'
                     )}>
                       <span className="text-base leading-none">{d.days}</span>
-                      <span className="text-[9px] uppercase tracking-wider opacity-80">days</span>
+                      <span className="text-[9px] uppercase tracking-wider opacity-80">{t("days")}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 truncate">{d.title}</p>
@@ -240,7 +233,7 @@ export function CommandCenter() {
                         </span>
                         <span className="text-xs text-slate-500">{formatUSD(d.valueUSD)}</span>
                         <span className="text-xs text-slate-400">·</span>
-                        <span className="text-xs text-slate-500">{formatDate(d.submissionDeadline)}</span>
+                        <span className="text-xs text-slate-500">{formatDateTime(d.submissionDeadline)}</span>
                       </div>
                     </div>
                     <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
@@ -254,12 +247,12 @@ export function CommandCenter() {
         {/* Active alerts */}
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Active Alerts</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Active Alerts")}</h2>
             <span className="text-xs text-slate-500">{data.alerts.length}</span>
           </div>
           <div className="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
             {data.alerts.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">No active alerts.</div>
+              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No active alerts.")}</div>
             ) : (
               data.alerts.map((a) => (
                 <div key={a.id} className="px-4 py-3">
@@ -272,7 +265,7 @@ export function CommandCenter() {
                       <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{a.message}</p>
                       {a.dueAt && (
                         <p className="text-[10px] text-slate-400 mt-1">
-                          Due {formatDate(a.dueAt)} ({daysUntil(a.dueAt)}d)
+                          {t("Due")}{formatDateTime(a.dueAt)} ({daysUntil(a.dueAt)}d)
                         </p>
                       )}
                     </div>
@@ -287,52 +280,20 @@ export function CommandCenter() {
       {/* Charts: pipeline + market value */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Pipeline Distribution</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Pipeline Distribution")}</h2>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pipelineData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={80}
-                  innerRadius={40}
-                  paddingAngle={2}
-                >
-                  {pipelineData.map((entry, i) => (
-                    <Cell key={i} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                />
-                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-              </PieChart>
-            </ResponsiveContainer>
+            <DeferredDonutChart label={t("Pipeline Distribution")} data={pipelineData} />
           </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Pipeline Value by Market (USD K)</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Pipeline Value by Market (USD K)")}</h2>
           <div className="h-64">
             {marketValueData.length === 0 ? (
               <div className="flex h-full items-center justify-center text-sm text-slate-500">
-                No pursuit data yet.
-              </div>
+                {t("No pursuit data yet.")}</div>
             ) : (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={marketValueData} margin={{ top: 4, right: 8, bottom: 4, left: 0 }}>
-                  <XAxis dataKey="market" tick={{ fontSize: 11 }} stroke="#64748b" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }}
-                    formatter={(v: number) => [`$${v}K`, 'Pipeline Value']}
-                  />
-                  <Bar dataKey="value" fill="#0f172a" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <DeferredBarChart label={t("Pipeline Value by Market (USD K)")} data={marketValueData} xKey="market" series={[{ key: "value", label: t("Pipeline Value"), color: "#0f172a" }]} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} valueFormatter={value => `$${value}K`} />
             )}
           </div>
         </div>
@@ -342,14 +303,14 @@ export function CommandCenter() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Recent Pursuits</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Recent Pursuits")}</h2>
             <button onClick={goPursuits} className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1">
-              View all <ArrowRight className="h-3 w-3" />
+              {t("View all")}<ArrowRight className="h-3 w-3" />
             </button>
           </div>
           <div className="divide-y divide-slate-100">
             {data.recentPursuits.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">No pursuits yet.</div>
+              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No pursuits yet.")}</div>
             ) : (
               data.recentPursuits.map((p) => (
                 <button
@@ -377,7 +338,7 @@ export function CommandCenter() {
                         <span className="text-xs text-slate-400">·</span>
                       )}
                       {p.tender.submissionDeadline && (
-                        <span className="text-xs text-slate-500">Due {formatDate(p.tender.submissionDeadline)}</span>
+                        <span className="text-xs text-slate-500">{t("Due")}{' '}{formatDateTime(p.tender.submissionDeadline)}</span>
                       )}
                     </div>
                   </div>
@@ -390,12 +351,12 @@ export function CommandCenter() {
 
         <div className="rounded-lg border border-slate-200 bg-white">
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">Recent Awards (Intelligence)</h2>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Recent Awards (Intelligence)")}</h2>
             <span className="text-xs text-slate-500">Award Intel · Phase 3</span>
           </div>
           <div className="divide-y divide-slate-100">
             {data.recentAwards.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">No award intelligence yet.</div>
+              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No award intelligence yet.")}</div>
             ) : (
               data.recentAwards.map((a, i) => (
                 <div key={i} className="px-4 py-3">
@@ -404,7 +365,7 @@ export function CommandCenter() {
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', marketColor(a.tender.market))}>
                       {marketLabel(a.tender.market)}
                     </span>
-                    <span className="text-xs text-slate-600">Awarded to <strong>{a.supplier}</strong></span>
+                    <span className="text-xs text-slate-600">{t("Awarded to")}{' '}<strong>{a.supplier}</strong></span>
                     <span className="text-xs text-slate-400">·</span>
                     <span className="text-xs font-medium text-slate-700">{formatUSD(a.contractValue)}</span>
                   </div>

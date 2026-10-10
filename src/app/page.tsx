@@ -1,45 +1,68 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useAppStore } from '@/lib/store'
+import { useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
+import { apiFetch } from '@/lib/api-client'
+import { bindUrlNavigation, useAppStore } from '@/lib/store'
+import { ApiFailureNotice } from '@/components/ApiFailureNotice'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Topbar } from '@/components/layout/Topbar'
-import { CommandCenter } from '@/components/views/CommandCenter'
-import { Discover } from '@/components/views/Discover'
-import { TenderDigitalTwin } from '@/components/views/TenderDigitalTwin'
-import { CompanyBrain } from '@/components/views/CompanyBrain'
-import { Pursuits } from '@/components/views/Pursuits'
-import { BidRoom } from '@/components/views/BidRoom'
-import { ComplianceMatrix } from '@/components/views/ComplianceMatrix'
-import { SignIn } from '@/components/views/SignIn'
-import { AuditLog } from '@/components/views/AuditLog'
-import { Extractions } from '@/components/views/Extractions'
-import { Connectors } from '@/components/views/Connectors'
-import { Settings } from '@/components/views/Settings'
-import { BuyerIntel, BuyerDetail } from '@/components/views/BuyerIntel'
-import { AwardIntel } from '@/components/views/AwardIntel'
-import { CompetitorIntel, CompetitorDetail } from '@/components/views/CompetitorIntel'
-import { PartnerFinder } from '@/components/views/PartnerFinder'
-import { Admin } from '@/components/views/Admin'
-import { Billing } from '@/components/views/Billing'
-import { Proposals, ProposalEditor } from '@/components/views/Proposals'
-import { Approvals } from '@/components/views/Approvals'
-import { Webhooks } from '@/components/views/Webhooks'
-import { Notifications } from '@/components/views/Notifications'
-import { Financials } from '@/components/views/Financials'
-import { Developer } from '@/components/views/Developer'
-import { Analytics } from '@/components/views/Analytics'
-import { Markets } from '@/components/views/Markets'
+import { useTranslation } from '@/hooks/use-translation'
+const CommandCenter = dynamic(() => import('@/components/views/CommandCenter').then(m => m.CommandCenter), { loading: ViewLoading })
+const Discover = dynamic(() => import('@/components/views/Discover').then(m => m.Discover), { loading: ViewLoading })
+const TenderDigitalTwin = dynamic(() => import('@/components/views/TenderDigitalTwin').then(m => m.TenderDigitalTwin), { loading: ViewLoading })
+const CompanyBrain = dynamic(() => import('@/components/views/CompanyBrain').then(m => m.CompanyBrain), { loading: ViewLoading })
+const Pursuits = dynamic(() => import('@/components/views/Pursuits').then(m => m.Pursuits), { loading: ViewLoading })
+const BidRoom = dynamic(() => import('@/components/views/BidRoom').then(m => m.BidRoom), { loading: ViewLoading })
+const ComplianceMatrix = dynamic(() => import('@/components/views/ComplianceMatrix').then(m => m.ComplianceMatrix), { loading: ViewLoading })
+const SignIn = dynamic(() => import('@/components/views/SignIn').then(m => m.SignIn), { loading: ViewLoading })
+const AuditLog = dynamic(() => import('@/components/views/AuditLog').then(m => m.AuditLog), { loading: ViewLoading })
+const Extractions = dynamic(() => import('@/components/views/Extractions').then(m => m.Extractions), { loading: ViewLoading })
+const Connectors = dynamic(() => import('@/components/views/Connectors').then(m => m.Connectors), { loading: ViewLoading })
+const Settings = dynamic(() => import('@/components/views/Settings').then(m => m.Settings), { loading: ViewLoading })
+const BuyerIntel = dynamic(() => import('@/components/views/BuyerIntel').then(m => m.BuyerIntel), { loading: ViewLoading })
+const BuyerDetail = dynamic(() => import('@/components/views/BuyerIntel').then(m => m.BuyerDetail), { loading: ViewLoading })
+const AwardIntel = dynamic(() => import('@/components/views/AwardIntel').then(m => m.AwardIntel), { loading: ViewLoading })
+const CompetitorIntel = dynamic(() => import('@/components/views/CompetitorIntel').then(m => m.CompetitorIntel), { loading: ViewLoading })
+const CompetitorDetail = dynamic(() => import('@/components/views/CompetitorIntel').then(m => m.CompetitorDetail), { loading: ViewLoading })
+const PartnerFinder = dynamic(() => import('@/components/views/PartnerFinder').then(m => m.PartnerFinder), { loading: ViewLoading })
+const Admin = dynamic(() => import('@/components/views/Admin').then(m => m.Admin), { loading: ViewLoading })
+const Billing = dynamic(() => import('@/components/views/Billing').then(m => m.Billing), { loading: ViewLoading })
+const Proposals = dynamic(() => import('@/components/views/Proposals').then(m => m.Proposals), { loading: ViewLoading })
+const ProposalEditor = dynamic(() => import('@/components/views/Proposals').then(m => m.ProposalEditor), { loading: ViewLoading })
+const Approvals = dynamic(() => import('@/components/views/Approvals').then(m => m.Approvals), { loading: ViewLoading })
+const Webhooks = dynamic(() => import('@/components/views/Webhooks').then(m => m.Webhooks), { loading: ViewLoading })
+const Notifications = dynamic(() => import('@/components/views/Notifications').then(m => m.Notifications), { loading: ViewLoading })
+const Financials = dynamic(() => import('@/components/views/Financials').then(m => m.Financials), { loading: ViewLoading })
+const Developer = dynamic(() => import('@/components/views/Developer').then(m => m.Developer), { loading: ViewLoading })
+const Analytics = dynamic(() => import('@/components/views/Analytics').then(m => m.Analytics), { loading: ViewLoading })
+const Markets = dynamic(() => import('@/components/views/Markets').then(m => m.Markets), { loading: ViewLoading })
+
+function ViewLoading() {
+  const { t } = useTranslation()
+  return <div role="status" className="space-y-3 p-4"><span className="sr-only">{t('shell.loadingModule')}</span><div className="h-8 w-48 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded bg-slate-100" /></div>
+}
 
 export default function Home() {
+  const { t } = useTranslation()
   const view = useAppStore((s) => s.view)
-  const auth = useAppStore((s) => s.auth)
   const setAuth = useAppStore((s) => s.setAuth)
-  const goCommand = useAppStore((s) => s.goCommand)
+
+  const mainRef = useRef<HTMLElement>(null)
+  const previousView = useRef(view)
+  useEffect(() => bindUrlNavigation(), [])
+  useEffect(() => {
+    if (previousView.current !== view) {
+      mainRef.current?.focus({ preventScroll: true })
+      mainRef.current?.scrollTo?.(0, 0)
+      previousView.current = view
+    }
+  }, [view])
 
   // Check auth state on initial load
   useEffect(() => {
-    fetch('/api/auth/me')
+    if (new URL(window.location.href).searchParams.has('accountToken')) return
+    apiFetch('/api/auth/me')
       .then(r => r.json())
       .then(me => {
         if (me.authenticated) {
@@ -56,10 +79,12 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-white focus:p-3">{t('shell.skipContent')}</a>
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <ApiFailureNotice />
+        <main id="main-content" ref={mainRef} tabIndex={-1} className="flex-1 overflow-y-auto p-4 md:p-6">
           {view.type === 'command' && <CommandCenter />}
           {view.type === 'discover' && <Discover />}
           {view.type === 'tender' && <TenderDigitalTwin tenderId={view.tenderId} />}

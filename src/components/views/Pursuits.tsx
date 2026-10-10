@@ -1,6 +1,9 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+
 import { useAppStore } from '@/lib/store'
 import {
   formatUSD,
@@ -53,18 +56,15 @@ const PIPELINE_COLUMNS = [
 ] as const
 
 export function Pursuits() {
-  const [items, setItems] = useState<PursuitListItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const { t, formatDateTime } = useTranslation()
+
   const openBidRoom = useAppStore((s) => s.openBidRoom)
 
-  useEffect(() => {
-    fetch('/api/pursuits')
-      .then(r => r.json())
-      .then(d => { setItems(d.items ?? []); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, loading, error, refetch } = useApiQuery<{ items: PursuitListItem[] }>('/api/pursuits')
+  const items = data?.items ?? []
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading pursuits...</div>
+  if (error) return <div role="alert" className="p-6 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading pursuits...")}</div>
 
   const totalValue = items.reduce((acc, p) => acc + (p.estimatedValueUSD ?? 0), 0)
   const wonCount = items.filter(p => p.stage === 'won').length
@@ -77,8 +77,7 @@ export function Pursuits() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Target className="h-6 w-6 text-slate-700" />
-            Pursuits Pipeline
-          </h1>
+            {t("Pursuits Pipeline")}</h1>
           <p className="text-sm text-slate-500 mt-1">
             {items.length} total · {formatUSD(totalValue)} pipeline value · {wonCount}W / {lostCount}L
           </p>
@@ -87,8 +86,7 @@ export function Pursuits() {
           className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
           onClick={() => useAppStore.getState().goDiscover()}
         >
-          <Plus className="h-3.5 w-3.5" /> New Pursuit
-        </button>
+          <Plus className="h-3.5 w-3.5" /> {t("New Pursuit")}</button>
       </div>
 
       {/* Kanban */}
@@ -113,7 +111,7 @@ export function Pursuits() {
               </div>
               <div className="flex-1 p-2 space-y-2 max-h-[28rem] overflow-y-auto">
                 {colItems.length === 0 ? (
-                  <div className="text-center py-8 text-[10px] text-slate-400">No pursuits</div>
+                  <div className="text-center py-8 text-[10px] text-slate-400">{t("No pursuits")}</div>
                 ) : (
                   colItems.map(p => {
                     const days = daysUntil(p.tender.submissionDeadline)
@@ -121,7 +119,7 @@ export function Pursuits() {
                       <button
                         key={p.id}
                         onClick={() => openBidRoom(p.id)}
-                        className="w-full text-left rounded-md border border-slate-200 bg-white p-2.5 hover:border-slate-300 hover:shadow-sm transition-all"
+                            className="w-full text-left rounded-md border border-slate-200 bg-white p-2.5 hover:border-slate-300 hover:shadow-sm transition-all"
                       >
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <span className={cn('text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded', marketColor(p.tender.market))}>
@@ -130,7 +128,7 @@ export function Pursuits() {
                           {p.priority === 'strategic' && (
                             <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-violet-500/15 text-violet-700">strategic</span>
                           )}
-                          {p.priority === 'high' && p.priority !== 'strategic' && (
+                          {p.priority === 'high' && (
                             <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700">high</span>
                           )}
                         </div>
@@ -157,8 +155,7 @@ export function Pursuits() {
                             <div className="flex items-center justify-between text-[9px] text-slate-500 mb-0.5">
                               <span className="flex items-center gap-0.5">
                                 <TrendingUp className="h-2.5 w-2.5" />
-                                Win prob.
-                              </span>
+                                {t("Win prob.")}</span>
                               <span className="font-medium text-slate-700">{Math.round(p.winProbability * 100)}%</span>
                             </div>
                             <div className="w-full bg-slate-100 rounded-full h-1">
@@ -179,18 +176,18 @@ export function Pursuits() {
       {/* List view */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">All Pursuits</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{t("All Pursuits")}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tender</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Market</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Stage</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Decision</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Value</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Deadline</th>
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Tender")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Market")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Stage")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Decision")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Value")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Deadline")}</th>
                 <th className="px-2 py-2"></th>
               </tr>
             </thead>
@@ -200,11 +197,10 @@ export function Pursuits() {
                 return (
                   <tr
                     key={p.id}
-                    onClick={() => openBidRoom(p.id)}
                     className="hover:bg-slate-50 cursor-pointer"
                   >
                     <td className="px-4 py-3 max-w-md">
-                      <p className="text-sm font-medium text-slate-900 line-clamp-1">{p.tender.title}</p>
+                      <button type="button" onClick={() => openBidRoom(p.id)} className="text-left text-sm font-medium text-slate-900 line-clamp-1 hover:underline focus-visible:outline focus-visible:outline-2">{p.tender.title}</button>
                       <p className="text-xs text-slate-500 mt-0.5">{p.tender.buyer ?? 'Unknown buyer'}</p>
                     </td>
                     <td className="px-3 py-3">
@@ -233,7 +229,7 @@ export function Pursuits() {
                     <td className="px-3 py-3 text-xs text-slate-600">
                       {p.tender.submissionDeadline ? (
                         <div>
-                          <p>{formatDate(p.tender.submissionDeadline)}</p>
+                          <p>{formatDateTime(p.tender.submissionDeadline)}</p>
                           {days !== null && days >= 0 && <p className="text-[10px] text-slate-400">{days}d remaining</p>}
                         </div>
                       ) : '—'}

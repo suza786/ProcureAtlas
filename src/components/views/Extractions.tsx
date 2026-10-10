@@ -1,4 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -32,6 +36,10 @@ interface ExtractionItem {
     criterion: string
     operator: string | null
     threshold: string | null
+    thresholdAmount?: number
+    thresholdCurrency?: string
+    thresholdUnit?: string
+    evaluationMetric?: string
     isMandatory: boolean
     sourceSnippet: string
     confidence: number
@@ -45,6 +53,8 @@ interface ExtractionItem {
 }
 
 export function Extractions() {
+  const { t, formatDateTime } = useTranslation()
+
   const [items, setItems] = useState<ExtractionItem[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
@@ -53,11 +63,14 @@ export function Extractions() {
   const [editedItems, setEditedItems] = useState<ExtractionItem['items']>([])
   const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [amountInputs, setAmountInputs] = useState<Record<number, string>>({})
+  const [hasEdits, setHasEdits] = useState(false)
   const openTender = useAppStore((s) => s.openTender)
 
   const load = () => {
     setLoading(true)
-    fetch(`/api/extractions?reviewStatus=${filter}`)
+    apiFetch(`/api/extractions?reviewStatus=${filter}`)
       .then(r => r.json())
       .then(d => { setItems(d.items ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -68,27 +81,54 @@ export function Extractions() {
   const openReview = (item: ExtractionItem) => {
     setSelected(item)
     setEditedItems(item.items.map(i => ({ ...i })))
+    setAmountInputs(Object.fromEntries(item.items.map((value, index) => [index, value.thresholdAmount === undefined ? '' : String(value.thresholdAmount)])))
+    setHasEdits(false)
+    setReviewError(null)
     setNotes('')
     setEditing(false)
   }
 
+  const updateItem = (index: number, change: Partial<ExtractionItem['items'][number]>) => {
+    setEditedItems(previous => previous.map((item, position) => position === index ? { ...item, ...change } : item))
+    setHasEdits(true)
+  }
+
   const submitReview = async (decision: 'approved' | 'rejected' | 'edited') => {
     if (!selected) return
+    setReviewError(null)
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/extractions/${selected.id}`, {
+      const reviewedItems = decision === 'edited' ? editedItems.map((item, index) => {
+        const rawAmount = (amountInputs[index] ?? '').trim()
+        if (rawAmount && (!/^\d+(?:\.\d+)?$/.test(rawAmount) || !Number.isFinite(Number(rawAmount)) || Number(rawAmount) > 1e12)) {
+          throw new Error(`Item ${index + 1}: enter an amount between 0 and 1,000,000,000,000 using digits and a decimal point, or leave it blank.`)
+        }
+        return { category: item.category, criterion: item.criterion, operator: item.operator, threshold: item.threshold,
+          isMandatory: item.isMandatory, sourceSnippet: item.sourceSnippet, confidence: item.confidence,
+          ...(rawAmount ? { thresholdAmount: Number(rawAmount) } : {}),
+          ...(item.thresholdCurrency?.trim() ? { thresholdCurrency: item.thresholdCurrency.trim().toUpperCase() } : {}),
+          ...(item.thresholdUnit?.trim() ? { thresholdUnit: item.thresholdUnit.trim() } : {}),
+          ...(item.evaluationMetric?.trim() ? { evaluationMetric: item.evaluationMetric.trim() } : {}),
+        }
+      }) : undefined
+      const res = await apiFetch(`/api/extractions/${selected.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           decision,
           notes,
-          editedItems: decision === 'edited' ? editedItems : undefined,
+          editedItems: reviewedItems,
         }),
       })
       if (res.ok) {
         setSelected(null)
         load()
+      } else {
+        const error = await res.json()
+        throw new Error(error.error ?? 'Could not save the extraction review')
       }
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : 'Could not save the extraction review')
     } finally {
       setSubmitting(false)
     }
@@ -100,10 +140,9 @@ export function Extractions() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Brain className="h-6 w-6 text-violet-600" />
-          LLM Extraction Review Queue
-        </h1>
+          {t("LLM Extraction Review Queue")}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Every LLM extraction is pending human review until approved. Nothing reaches the Requirement table without explicit approval.
+          Every LLM extraction is pending human review until approved. Reviewed requirements stay private to your workspace.
         </p>
       </div>
 
@@ -126,7 +165,7 @@ export function Extractions() {
       {/* Queue */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading extractions...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading extractions...")}</div>
         ) : items.length === 0 ? (
           <div className="p-8 text-center">
             <Brain className="h-8 w-8 text-slate-300 mx-auto mb-3" />
@@ -197,24 +236,24 @@ export function Extractions() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Review Extraction</h2>
+              <h2 className="text-sm font-semibold text-slate-900">{t("Review Extraction")}</h2>
               <button
                 onClick={() => setSelected(null)}
                 className="text-slate-400 hover:text-slate-900 text-xs"
-              >Close ✕</button>
+              >{t("Close ✕")}</button>
             </div>
 
             <div className="p-6 space-y-4">
               {/* Meta */}
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <Field label="Task type" value={selected.taskType} />
-                <Field label="Model" value={selected.model ?? '—'} />
-                <Field label="Status" value={selected.status} />
-                <Field label="Review status" value={selected.reviewStatus} />
-                <Field label="Latency" value={selected.latencyMs ? `${selected.latencyMs}ms` : '—'} />
-                <Field label="Cost" value={selected.costUsd ? `$${selected.costUsd.toFixed(4)}` : '—'} />
-                <Field label="Input tokens" value={selected.inputTokens?.toString() ?? '—'} />
-                <Field label="Output tokens" value={selected.outputTokens?.toString() ?? '—'} />
+                <Field label={t("Task type")} value={selected.taskType} />
+                <Field label={t("Model")} value={selected.model ?? '—'} />
+                <Field label={t("Status")} value={selected.status} />
+                <Field label={t("Review status")} value={selected.reviewStatus} />
+                <Field label={t("Latency")} value={selected.latencyMs ? `${selected.latencyMs}ms` : '—'} />
+                <Field label={t("Cost")} value={selected.costUsd ? `$${selected.costUsd.toFixed(4)}` : '—'} />
+                <Field label={t("Input tokens")} value={selected.inputTokens?.toString() ?? '—'} />
+                <Field label={t("Output tokens")} value={selected.outputTokens?.toString() ?? '—'} />
               </div>
 
               {selected.tender && (
@@ -261,39 +300,50 @@ export function Extractions() {
                         ) : (
                           <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">optional</span>
                         )}
-                        <span className="text-[10px] text-slate-500 ml-auto">Confidence: {Math.round(item.confidence * 100)}%</span>
+                        <span className="text-[10px] text-slate-500 ml-auto">{t("Confidence:")}{' '}{Math.round(item.confidence * 100)}%</span>
                       </div>
 
                       {editing ? (
                         <div className="space-y-2">
                           <input
                             type="text"
+                            aria-label={`Item ${i + 1} criterion`}
                             value={item.criterion}
-                            onChange={(e) => {
-                              const next = [...editedItems]
-                              next[i] = { ...next[i], criterion: e.target.value }
-                              setEditedItems(next)
-                            }}
+                            onChange={(e) => updateItem(i, { criterion: e.target.value })}
                             className="w-full text-sm font-medium border border-slate-200 rounded px-2 py-1 outline-none focus:border-slate-400"
                           />
                           <input
                             type="text"
+                            aria-label={`Item ${i + 1} original threshold text`}
                             value={item.threshold ?? ''}
-                            onChange={(e) => {
-                              const next = [...editedItems]
-                              next[i] = { ...next[i], threshold: e.target.value }
-                              setEditedItems(next)
-                            }}
-                            placeholder="Threshold"
+                            onChange={(e) => updateItem(i, { threshold: e.target.value })}
+                            placeholder={t("Threshold")}
                             className="w-full text-xs border border-slate-200 rounded px-2 py-1 outline-none focus:border-slate-400"
                           />
+                          <fieldset className="rounded border border-slate-200 p-2 space-y-2">
+                            <legend className="px-1 text-xs font-medium text-slate-700">{t("Structured threshold (optional)")}</legend>
+                            <p id={`threshold-help-${i}`} className="text-xs text-slate-500">Verify these values against the source. The metric and unit must match verified company evidence; monetary amounts require a currency. Blank amounts remain unknown.</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" aria-describedby={`threshold-help-${i}`}>
+                              <label className="text-xs text-slate-700">{t("Metric")}<input type="text" value={item.evaluationMetric ?? ''} placeholder="annual_turnover" onChange={event => updateItem(i, { evaluationMetric: event.target.value })} className="mt-1 w-full rounded border border-slate-200 px-2 py-1" />
+                              </label>
+                              <label className="text-xs text-slate-700">{t("Comparison")}<select value={item.operator ?? ''} onChange={event => updateItem(i, { operator: event.target.value || null })} className="mt-1 w-full rounded border border-slate-200 bg-white px-2 py-1">
+                                  <option value="">{t("Unknown")}</option>
+                                  {['>=', '<=', '==', '>', '<'].map(operator => <option key={operator} value={operator}>{operator}</option>)}
+                                  {item.operator && !['>=', '<=', '==', '>', '<'].includes(item.operator) && <option value={item.operator}>{item.operator} {' '}{t("(text rule)")}</option>}
+                                </select>
+                              </label>
+                              <label className="text-xs text-slate-700">{t("Amount")}<input type="text" inputMode="decimal" value={amountInputs[i] ?? ''} placeholder={t("Leave blank if unknown")} onChange={event => { setAmountInputs(previous => ({ ...previous, [i]: event.target.value })); setHasEdits(true) }} className="mt-1 w-full rounded border border-slate-200 px-2 py-1" />
+                              </label>
+                              <label className="text-xs text-slate-700">{t("Currency")}<input type="text" maxLength={3} value={item.thresholdCurrency ?? ''} placeholder="USD" onChange={event => updateItem(i, { thresholdCurrency: event.target.value.toUpperCase() })} className="mt-1 w-full rounded border border-slate-200 px-2 py-1" />
+                              </label>
+                              <label className="text-xs text-slate-700">{t("Unit")}<input type="text" value={item.thresholdUnit ?? ''} placeholder={t("money, years or count")} onChange={event => updateItem(i, { thresholdUnit: event.target.value })} className="mt-1 w-full rounded border border-slate-200 px-2 py-1" />
+                              </label>
+                            </div>
+                          </fieldset>
                           <textarea
+                            aria-label={`Item ${i + 1} source snippet`}
                             value={item.sourceSnippet}
-                            onChange={(e) => {
-                              const next = [...editedItems]
-                              next[i] = { ...next[i], sourceSnippet: e.target.value }
-                              setEditedItems(next)
-                            }}
+                            onChange={(e) => updateItem(i, { sourceSnippet: e.target.value })}
                             className="w-full text-xs italic border border-slate-200 rounded px-2 py-1 outline-none focus:border-slate-400"
                             rows={2}
                           />
@@ -301,14 +351,9 @@ export function Extractions() {
                             <input
                               type="checkbox"
                               checked={item.isMandatory}
-                              onChange={(e) => {
-                                const next = [...editedItems]
-                                next[i] = { ...next[i], isMandatory: e.target.checked }
-                                setEditedItems(next)
-                              }}
+                              onChange={(e) => updateItem(i, { isMandatory: e.target.checked })}
                             />
-                            Mandatory
-                          </label>
+                            {t("Mandatory")}</label>
                         </div>
                       ) : (
                         <>
@@ -317,6 +362,9 @@ export function Extractions() {
                             <p className="text-xs text-slate-600 mt-0.5">
                               {item.operator} <strong>{item.threshold}</strong>
                             </p>
+                          )}
+                          {(item.evaluationMetric || item.thresholdAmount !== undefined) && (
+                            <p className="text-xs text-slate-600 mt-1">{t("Structured threshold:")}{' '}{item.evaluationMetric ?? 'Unknown metric'} {item.operator ?? ''} {hasEdits ? amountInputs[i] || 'Unknown amount' : item.thresholdAmount ?? 'Unknown amount'} {item.thresholdCurrency ?? ''} {item.thresholdUnit ?? 'Unknown unit'}</p>
                           )}
                           <p className="text-xs text-slate-500 italic mt-1.5 leading-relaxed">
                             &ldquo;{item.sourceSnippet}&rdquo;
@@ -331,11 +379,12 @@ export function Extractions() {
               {/* Review notes */}
               {selected.reviewStatus === 'pending' && (
                 <div>
-                  <label className="block text-xs font-medium text-slate-700 mb-1">Review notes (optional)</label>
+                  <label className="block text-xs font-medium text-slate-700 mb-1">{t("Review notes (optional)")}</label>
                   <textarea
+                    aria-label={t("Review notes")}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Add notes for the audit trail..."
+                    placeholder={t("Add notes for the audit trail...")}
                     className="w-full text-sm border border-slate-200 rounded-md px-3 py-2 outline-none focus:border-slate-400"
                     rows={3}
                   />
@@ -343,15 +392,16 @@ export function Extractions() {
               )}
 
               {/* Actions */}
+              {reviewError && <p role="alert" className="text-xs text-rose-700">{reviewError}</p>}
               {selected.reviewStatus === 'pending' && (
                 <div className="flex gap-2 pt-2 border-t border-slate-100">
                   <button
-                    onClick={() => submitReview('approved')}
+                    onClick={() => submitReview(hasEdits ? 'edited' : 'approved')}
                     disabled={submitting}
                     className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                    Approve & create requirements
+                    {hasEdits ? 'Approve edited requirements' : 'Approve reviewed requirements'}
                   </button>
                   {editing && (
                     <button
@@ -359,22 +409,20 @@ export function Extractions() {
                       disabled={submitting}
                       className="flex items-center gap-1.5 rounded-md bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
                     >
-                      <Edit3 className="h-3.5 w-3.5" /> Submit edited
-                    </button>
+                      <Edit3 className="h-3.5 w-3.5" /> {t("Submit edited")}</button>
                   )}
                   <button
                     onClick={() => submitReview('rejected')}
                     disabled={submitting}
                     className="flex items-center gap-1.5 rounded-md border border-rose-500/30 text-rose-700 px-3 py-2 text-xs font-medium hover:bg-rose-50 disabled:opacity-50"
                   >
-                    <XCircle className="h-3.5 w-3.5" /> Reject
-                  </button>
+                    <XCircle className="h-3.5 w-3.5" /> {t("Reject")}</button>
                 </div>
               )}
 
               {selected.reviewStatus !== 'pending' && (
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs">
-                  <p className="font-medium text-slate-700">Reviewed by {selected.reviewedBy?.email ?? '—'} on {selected.reviewedAt ? formatDateTime(selected.reviewedAt) : '—'}</p>
+                  <p className="font-medium text-slate-700">{t("Reviewed by")}{' '}{selected.reviewedBy?.email ?? '—'} on {selected.reviewedAt ? formatDateTime(selected.reviewedAt) : '—'}</p>
                   {selected.reviewNotes && <p className="text-slate-600 mt-1">{selected.reviewNotes}</p>}
                 </div>
               )}

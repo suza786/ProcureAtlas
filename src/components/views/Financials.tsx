@@ -1,8 +1,11 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
 
 import { useEffect, useState } from 'react'
-import { useAppStore } from '@/lib/store'
-import { formatUSD, formatDate } from '@/lib/format'
+import { apiFetch } from '@/lib/api-client'
+import { calculateBidPrice, formatCurrencyAmount } from '@/lib/financial-calculations'
+import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   Calculator,
@@ -34,6 +37,10 @@ interface BidCostEstimate {
   createdBy: string | null
   createdAt: string
   updatedAt: string
+  tenderValuePct: number | null
+  actualMarginPct: number | null
+  markupPct: number | null
+  fxExplanation: string
   pursuit: { id: string; tender: { title: string; market: string; valueUSD: number | null; currency: string } }
 }
 
@@ -47,21 +54,23 @@ interface CurrencyRate {
 }
 
 export function Financials() {
+  const { t, formatDate } = useTranslation()
+
   const [estimates, setEstimates] = useState<BidCostEstimate[]>([])
   const [rates, setRates] = useState<CurrencyRate[]>([])
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [tab, setTab] = useState<'estimates' | 'rates'>('estimates')
 
   const load = () => {
     Promise.all([
-      fetch('/api/bid-cost-estimates').then(r => r.json()),
-      fetch('/api/currency-rates').then(r => r.json()),
+      apiFetch('/api/bid-cost-estimates').then(r => r.json()),
+      apiFetch('/api/currency-rates').then(r => r.json()),
     ]).then(([est, rts]) => {
       setEstimates(est.items ?? [])
       setRates(rts.items ?? [])
-      setLoading(false)
-    })
+    }).catch(e => setLoadError(e.message)).finally(() => setLoading(false))
   }
 
   useEffect(() => { load() }, [])
@@ -72,20 +81,18 @@ export function Financials() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Calculator className="h-6 w-6 text-slate-700" />
-            Financial Modeling
-          </h1>
+            {t("Financial Modeling")}</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Bid cost estimation with margin analysis and multi-currency support.
-          </p>
+            {t("Bid cost estimation with margin analysis and multi-currency support.")}</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
           className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
         >
-          <Plus className="h-3.5 w-3.5" /> New Estimate
-        </button>
+          <Plus className="h-3.5 w-3.5" /> {t("New Estimate")}</button>
       </div>
 
+      {loadError && <p role="alert" className="text-sm text-rose-700">{loadError}</p>}
       <div className="flex gap-2">
         {(['estimates', 'rates'] as const).map(t => (
           <button
@@ -101,12 +108,12 @@ export function Financials() {
         ))}
       </div>
 
-      {tab === 'estimates' && (
+      {tab === 'estimates' && !loadError && (
         <div className="space-y-3">
           {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading...</div>
+            <div className="p-8 text-center text-sm text-slate-500">{t("Loading...")}</div>
           ) : estimates.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">No cost estimates. Create one to model bid pricing.</div>
+            <div className="p-8 text-center text-sm text-slate-500">{t("No cost estimates. Create one to model bid pricing.")}</div>
           ) : (
             estimates.map(e => (
               <div key={e.id} className="rounded-lg border border-slate-200 bg-white p-4">
@@ -116,55 +123,55 @@ export function Financials() {
                     <p className="text-xs text-slate-500">{e.pursuit.tender.title}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-slate-900">{formatUSD(e.proposedPrice)}</p>
+                    <p className="text-lg font-bold text-slate-900">{formatCurrencyAmount(e.proposedPrice, e.currency)}</p>
                     <p className="text-[10px] text-slate-500">Proposed Price ({e.currency})</p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   <div className="rounded-md bg-slate-50 p-2">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total Cost</p>
-                    <p className="text-sm font-semibold text-slate-900">{formatUSD(e.totalCost)}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Total Cost")}</p>
+                    <p className="text-sm font-semibold text-slate-900">{formatCurrencyAmount(e.totalCost, e.currency)}</p>
                   </div>
                   <div className="rounded-md bg-emerald-50 p-2">
-                    <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-semibold">Profit</p>
-                    <p className="text-sm font-semibold text-emerald-700">{formatUSD(e.profitAmount)}</p>
-                    <p className="text-[10px] text-emerald-600">{e.marginPct}% margin</p>
+                    <p className="text-[10px] uppercase tracking-wider text-emerald-600 font-semibold">{t("Profit")}</p>
+                    <p className="text-sm font-semibold text-emerald-700">{formatCurrencyAmount(e.profitAmount, e.currency)}</p>
+                    <p className="text-[10px] text-emerald-600">{e.actualMarginPct == null ? t("Unknown") : e.actualMarginPct.toFixed(1)}% margin; {e.markupPct == null ? t("Unknown") : e.markupPct.toFixed(1)}% markup</p>
                   </div>
                   <div className="rounded-md bg-amber-50 p-2">
-                    <p className="text-[10px] uppercase tracking-wider text-amber-600 font-semibold">Contingency</p>
+                    <p className="text-[10px] uppercase tracking-wider text-amber-600 font-semibold">{t("Contingency")}</p>
                     <p className="text-sm font-semibold text-amber-700">{e.contingencyPct}%</p>
                   </div>
                   <div className="rounded-md bg-slate-50 p-2">
-                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">vs Tender Value</p>
-                    <p className="text-sm font-semibold text-slate-900">
-                      {e.pursuit.tender.valueUSD ? `${Math.round((e.proposedPrice / e.pursuit.tender.valueUSD) * 100)}%` : '—'}
+                    <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("vs Tender Value")}</p>
+                    <p title={e.fxExplanation} className="text-sm font-semibold text-slate-900">
+                      {e.tenderValuePct != null ? `${Math.round(e.tenderValuePct)}%` : t("Unknown")}
                     </p>
                   </div>
                 </div>
 
                 {/* Cost breakdown bar */}
                 <div className="mt-3">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Cost Breakdown</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">{t("Cost Breakdown")}</p>
                   <div className="flex h-2 rounded-full overflow-hidden bg-slate-100">
-                    {e.laborCost > 0 && <div className="bg-sky-500" style={{ width: `${(e.laborCost / e.totalCost) * 100}%` }} title={`Labor: ${formatUSD(e.laborCost)}`} />}
-                    {e.materialsCost > 0 && <div className="bg-violet-500" style={{ width: `${(e.materialsCost / e.totalCost) * 100}%` }} title={`Materials: ${formatUSD(e.materialsCost)}`} />}
-                    {e.subcontractorCost > 0 && <div className="bg-amber-500" style={{ width: `${(e.subcontractorCost / e.totalCost) * 100}%` }} title={`Subcontractor: ${formatUSD(e.subcontractorCost)}`} />}
-                    {e.overheadCost > 0 && <div className="bg-rose-500" style={{ width: `${(e.overheadCost / e.totalCost) * 100}%` }} title={`Overhead: ${formatUSD(e.overheadCost)}`} />}
-                    {e.travelCost > 0 && <div className="bg-emerald-500" style={{ width: `${(e.travelCost / e.totalCost) * 100}%` }} title={`Travel: ${formatUSD(e.travelCost)}`} />}
+                    {e.laborCost > 0 && <div className="bg-sky-500" style={{ width: `${(e.laborCost / e.totalCost) * 100}%` }} title={`Labor: ${formatCurrencyAmount(e.laborCost, e.currency)}`} />}
+                    {e.materialsCost > 0 && <div className="bg-violet-500" style={{ width: `${(e.materialsCost / e.totalCost) * 100}%` }} title={`Materials: ${formatCurrencyAmount(e.materialsCost, e.currency)}`} />}
+                    {e.subcontractorCost > 0 && <div className="bg-amber-500" style={{ width: `${(e.subcontractorCost / e.totalCost) * 100}%` }} title={`Subcontractor: ${formatCurrencyAmount(e.subcontractorCost, e.currency)}`} />}
+                    {e.overheadCost > 0 && <div className="bg-rose-500" style={{ width: `${(e.overheadCost / e.totalCost) * 100}%` }} title={`Overhead: ${formatCurrencyAmount(e.overheadCost, e.currency)}`} />}
+                    {e.travelCost > 0 && <div className="bg-emerald-500" style={{ width: `${(e.travelCost / e.totalCost) * 100}%` }} title={`Travel: ${formatCurrencyAmount(e.travelCost, e.currency)}`} />}
                   </div>
                   <div className="flex flex-wrap gap-3 mt-1.5 text-[10px] text-slate-500">
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-500" /> Labor {formatUSD(e.laborCost)}</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-500" /> Materials {formatUSD(e.materialsCost)}</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Subcontractor {formatUSD(e.subcontractorCost)}</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> Overhead {formatUSD(e.overheadCost)}</span>
-                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Travel {formatUSD(e.travelCost)}</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-500" /> {' '}{t("Labor")}{' '}{formatCurrencyAmount(e.laborCost, e.currency)}</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-500" /> {' '}{t("Materials")}{' '}{formatCurrencyAmount(e.materialsCost, e.currency)}</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> {' '}{t("Subcontractor")}{' '}{formatCurrencyAmount(e.subcontractorCost, e.currency)}</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500" /> {' '}{t("Overhead")}{' '}{formatCurrencyAmount(e.overheadCost, e.currency)}</span>
+                    <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> {' '}{t("Travel")}{' '}{formatCurrencyAmount(e.travelCost, e.currency)}</span>
                   </div>
                 </div>
 
                 {e.hedgingNotes && (
                   <div className="mt-2 rounded-md bg-amber-50 border border-amber-500/20 p-2 text-xs text-amber-800">
-                    <strong>Hedging:</strong> {e.hedgingNotes}
+                    <strong>{t("Hedging:")}</strong> {e.hedgingNotes}
                   </div>
                 )}
               </div>
@@ -173,30 +180,30 @@ export function Financials() {
         </div>
       )}
 
-      {tab === 'rates' && (
+      {tab === 'rates' && !loadError && (
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
           <div className="border-b border-slate-200 px-4 py-3 flex items-center gap-2">
             <Globe className="h-4 w-4 text-sky-600" />
-            <h2 className="text-sm font-semibold text-slate-900">Currency Rates</h2>
-            <span className="text-xs text-slate-500 ml-auto">Base: USD</span>
+            <h2 className="text-sm font-semibold text-slate-900">{t("Currency Rates")}</h2>
+            <span className="text-xs text-slate-500 ml-auto">{t("Dated currency pairs")}</span>
           </div>
           {rates.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">No currency rates configured.</div>
+            <div className="p-8 text-center text-sm text-slate-500">{t("No currency rates configured.")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Currency</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Rate (per USD)</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Source</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Date</th>
+                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Currency")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Rate (quote per base)")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Source")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Date")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {rates.map(r => (
                     <tr key={r.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{r.quoteCurrency}</td>
+                      <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{r.baseCurrency}/{r.quoteCurrency}</td>
                       <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{r.rate.toFixed(2)}</td>
                       <td className="px-3 py-2.5 text-xs text-slate-600">{r.source}</td>
                       <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(r.rateDate)}</td>
@@ -209,12 +216,14 @@ export function Financials() {
         </div>
       )}
 
-      {showCreate && <CreateEstimateModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load() }} />}
+      {showCreate && <CreateEstimateModal onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); setLoading(true); setLoadError(null); load() }} />}
     </div>
   )
 }
 
 function CreateEstimateModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const { t } = useTranslation()
+
   const [pursuits, setPursuits] = useState<Array<{ id: string; tender: { title: string } }>>([])
   const [form, setForm] = useState({
     pursuitId: '',
@@ -233,20 +242,21 @@ function CreateEstimateModal({ onClose, onCreated }: { onClose: () => void; onCr
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/pursuits').then(r => r.json()).then(d => setPursuits(d.items ?? []))
+    apiFetch('/api/pursuits').then(r => r.json()).then(d => setPursuits(d.items ?? [])).catch(e => setError(e.message))
   }, [])
 
-  const subtotal = form.laborCost + form.materialsCost + form.subcontractorCost + form.overheadCost + form.travelCost
-  const contingency = subtotal * (form.contingencyPct / 100)
-  const totalCost = subtotal + contingency
-  const profit = totalCost * (form.marginPct / 100)
-  const proposedPrice = totalCost + profit
+  let calculationError: string | null = null
+  let pricing = { subtotal: 0, contingency: 0, totalCost: 0, profitAmount: 0, proposedPrice: 0, markupPct: 0 }
+  try { pricing = calculateBidPrice([form.laborCost, form.materialsCost, form.subcontractorCost, form.overheadCost, form.travelCost], form.contingencyPct, form.marginPct) }
+  catch (e) { calculationError = (e as Error).message }
+  const { subtotal, contingency, totalCost, profitAmount: profit, proposedPrice } = pricing
 
   const create = async () => {
+    if (calculationError) { setError(calculationError); return }
     if (!form.pursuitId || !form.label) { setError('Select a pursuit and enter a label.'); return }
     setCreating(true)
     try {
-      const res = await fetch('/api/bid-cost-estimates', {
+      const res = await apiFetch('/api/bid-cost-estimates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -259,49 +269,53 @@ function CreateEstimateModal({ onClose, onCreated }: { onClose: () => void; onCr
   return (
     <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-lg rounded-lg bg-white p-6 max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">New Bid Cost Estimate</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-4">{t("New Bid Cost Estimate")}</h2>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Pursuit</label>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Pursuit")}</label>
             <select value={form.pursuitId} onChange={e => setForm({ ...form, pursuitId: e.target.value })} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white">
-              <option value="">Select...</option>
+              <option value="">{t("Select...")}</option>
               {pursuits.map(p => <option key={p.id} value={p.id}>{p.tender.title}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Label</label>
-            <input type="text" value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="e.g. Base estimate" className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Label")}</label>
+            <input type="text" value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder={t("e.g. Base estimate")} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Currency")}</label>
+            <input value={form.currency} maxLength={3} onChange={e => setForm({ ...form, currency: e.target.value.toUpperCase() })} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <CostInput label="Labor" value={form.laborCost} onChange={v => setForm({ ...form, laborCost: v })} />
-            <CostInput label="Materials" value={form.materialsCost} onChange={v => setForm({ ...form, materialsCost: v })} />
-            <CostInput label="Subcontractor" value={form.subcontractorCost} onChange={v => setForm({ ...form, subcontractorCost: v })} />
-            <CostInput label="Overhead" value={form.overheadCost} onChange={v => setForm({ ...form, overheadCost: v })} />
-            <CostInput label="Travel" value={form.travelCost} onChange={v => setForm({ ...form, travelCost: v })} />
-            <CostInput label="Contingency %" value={form.contingencyPct} onChange={v => setForm({ ...form, contingencyPct: v })} />
-            <CostInput label="Margin %" value={form.marginPct} onChange={v => setForm({ ...form, marginPct: v })} />
+            <CostInput label={t("Labor")} value={form.laborCost} onChange={v => setForm({ ...form, laborCost: v })} />
+            <CostInput label={t("Materials")} value={form.materialsCost} onChange={v => setForm({ ...form, materialsCost: v })} />
+            <CostInput label={t("Subcontractor")} value={form.subcontractorCost} onChange={v => setForm({ ...form, subcontractorCost: v })} />
+            <CostInput label={t("Overhead")} value={form.overheadCost} onChange={v => setForm({ ...form, overheadCost: v })} />
+            <CostInput label={t("Travel")} value={form.travelCost} onChange={v => setForm({ ...form, travelCost: v })} />
+            <CostInput label={t("Contingency %")} value={form.contingencyPct} onChange={v => setForm({ ...form, contingencyPct: v })} />
+            <CostInput label={t("Margin %")} value={form.marginPct} onChange={v => setForm({ ...form, marginPct: v })} />
           </div>
 
           {/* Summary */}
           <div className="rounded-md bg-slate-50 p-3 text-xs space-y-1">
-            <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-medium">{formatUSD(subtotal)}</span></div>
-            <div className="flex justify-between"><span className="text-slate-500">Contingency ({form.contingencyPct}%)</span><span className="font-medium">{formatUSD(contingency)}</span></div>
-            <div className="flex justify-between border-t border-slate-200 pt-1"><span className="text-slate-700 font-semibold">Total Cost</span><span className="font-bold">{formatUSD(totalCost)}</span></div>
-            <div className="flex justify-between"><span className="text-emerald-600">Profit ({form.marginPct}%)</span><span className="font-medium text-emerald-700">{formatUSD(profit)}</span></div>
-            <div className="flex justify-between border-t border-slate-300 pt-1"><span className="text-slate-900 font-bold">Proposed Price</span><span className="text-lg font-bold text-slate-900">{formatUSD(proposedPrice)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">{t("Subtotal")}</span><span className="font-medium">{formatCurrencyAmount(subtotal, form.currency)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-500">Contingency ({form.contingencyPct}%)</span><span className="font-medium">{formatCurrencyAmount(contingency, form.currency)}</span></div>
+            <div className="flex justify-between border-t border-slate-200 pt-1"><span className="text-slate-700 font-semibold">{t("Total Cost")}</span><span className="font-bold">{formatCurrencyAmount(totalCost, form.currency)}</span></div>
+            <div className="flex justify-between"><span className="text-emerald-600">Profit ({form.marginPct}% margin; {pricing.markupPct.toFixed(1)}% markup)</span><span className="font-medium text-emerald-700">{formatCurrencyAmount(profit, form.currency)}</span></div>
+            <div className="flex justify-between border-t border-slate-300 pt-1"><span className="text-slate-900 font-bold">{t("Proposed Price")}</span><span className="text-lg font-bold text-slate-900">{formatCurrencyAmount(proposedPrice, form.currency)}</span></div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Hedging Notes (optional)</label>
+            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Hedging Notes (optional)")}</label>
             <textarea value={form.hedgingNotes} onChange={e => setForm({ ...form, hedgingNotes: e.target.value })} placeholder="e.g. 50% costs in BDT, hedge via forward contract..." rows={2} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
           </div>
 
+          {calculationError && <p role="alert" className="text-xs text-rose-700">{calculationError}</p>}
           {error && <p className="text-xs text-rose-700">{error}</p>}
           <div className="flex gap-2 pt-2">
-            <button onClick={create} disabled={creating} className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
-              {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Create Estimate
-            </button>
-            <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">Cancel</button>
+            <button onClick={create} disabled={creating || Boolean(calculationError)} className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+              {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} {t("Create Estimate")}</button>
+            <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">{t("Cancel")}</button>
           </div>
         </div>
       </div>
@@ -315,6 +329,9 @@ function CostInput({ label, value, onChange }: { label: string; value: number; o
       <label className="block text-[10px] font-medium text-slate-700 mb-0.5">{label}</label>
       <input
         type="number"
+        min={0}
+        max={label === 'Margin %' ? 99.99 : label === 'Contingency %' ? 100 : undefined}
+        step="any"
         value={value}
         onChange={e => onChange(parseFloat(e.target.value) || 0)}
         className="w-full text-sm border border-slate-200 rounded-md px-2 py-1 outline-none focus:border-slate-400"

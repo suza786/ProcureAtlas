@@ -1,121 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import crypto from 'crypto'
-
-// POST /api/v1/webhooks/ingest — accept signed webhooks from external sources
-// Sources: World Bank, ADB, UNGM, external CRM, or custom integrations
-export async function POST(req: NextRequest) {
-  const body = await req.text()
-  const source = req.headers.get('x-webhook-source') ?? 'custom'
-  const eventType = req.headers.get('x-webhook-event') ?? 'unknown'
-  const signature = req.headers.get('x-webhook-signature')
-
-  // Verify signature if source has a known secret
-  // In production: each source would have a configured signing secret
-  let signatureValid = true
-  if (signature) {
-    // For demo: accept any signature format
-    // In production: verify HMAC against source-specific secret
-    signatureValid = signature.startsWith('sha256=') || signature.length > 10
-  }
-
-  // Parse payload
-  let payload: unknown
-  try {
-    payload = JSON.parse(body)
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 })
-  }
-
-  // Create inbound webhook record
-  const webhook = await db.inboundWebhook.create({
-    data: {
-      source,
-      eventType,
-      signature,
-      signatureValid,
-      payloadJson: body,
-      processedStatus: 'pending',
-    },
-  })
-
-  // Process the webhook (simplified — in production this would be async via worker)
-  try {
-    let createdEntities: string[] = []
-
-    // Handle different sources
-    if (source === 'worldbank' || source === 'adb' || source === 'ungm') {
-      // Try to create a tender from the payload
-      const data = payload as Record<string, unknown>
-      if (data.title && data.url) {
-        const existing = await db.tender.findUnique({
-          where: {
-            sourcePortal_externalId: {
-              sourcePortal: source,
-              externalId: String(data.id ?? data.reference ?? 'unknown'),
-            },
-          },
-        })
-
-        if (!existing) {
-          const tender = await db.tender.create({
-            data: {
-              externalId: String(data.id ?? data.reference ?? `ext-${Date.now()}`),
-              sourcePortal: source,
-              sourceUrl: String(data.url),
-              title: String(data.title),
-              description: data.description ? String(data.description) : null,
-              country: String(data.country ?? 'GLOBAL'),
-              market: source === 'worldbank' ? 'WB' : source === 'adb' ? 'ADB' : 'UN',
-              sector: String(data.sector ?? 'IT'),
-              currency: String(data.currency ?? 'USD'),
-              estimatedValue: data.value ? Number(data.value) : null,
-              valueUSD: data.value_usd ? Number(data.value_usd) : (data.value ? Number(data.value) : null),
-              publishedAt: data.published ? new Date(String(data.published)) : new Date(),
-              submissionDeadline: data.deadline ? new Date(String(data.deadline)) : null,
-              status: 'active',
-              confidence: 0.95,
-            },
-          })
-          createdEntities.push(`tender:${tender.id}`)
-        }
-      }
-    }
-
-    // Mark as processed
-    await db.inboundWebhook.update({
-      where: { id: webhook.id },
-      data: {
-        processedStatus: 'processed',
-        processedAt: new Date(),
-        createdEntities: createdEntities.length > 0 ? JSON.stringify(createdEntities) : null,
-      },
-    })
-
-    return NextResponse.json({
-      success: true,
-      webhookId: webhook.id,
-      source,
-      eventType,
-      signatureValid,
-      entitiesCreated: createdEntities.length,
-      createdEntities,
-    }, { status: 200 })
-
-  } catch (e) {
-    await db.inboundWebhook.update({
-      where: { id: webhook.id },
-      data: {
-        processedStatus: 'failed',
-        processedAt: new Date(),
-        errorMessage: (e as Error).message.slice(0, 2000),
-      },
-    })
-
-    return NextResponse.json({
-      success: false,
-      webhookId: webhook.id,
-      error: (e as Error).message,
-    }, { status: 500 })
-  }
+import { withApiErrors } from '@/lib/api-errors'
+import { readWebhookBody, verifyInboundWebhook } from '@/lib/inbound-webhook'
+import { inboundTenderSchema, idSchema } from '@/lib/api-validation'
+import { enqueueOutbox } from '@/lib/outbox'
+function configuration(name: string): Record<string, unknown> {
+  try { const value: unknown=JSON.parse(process.env[name]??'{}');if(value&&typeof value==='object'&&!Array.isArray(value))return value as Record<string,unknown> }catch{}
+  return {}
 }
+export const POST=withApiErrors(async function POST(req:NextRequest){
+  const body=await readWebhookBody(req)
+  const {source,eventType,eventId,signature}=verifyInboundWebhook(req.headers,body,configuration('INBOUND_WEBHOOK_SECRETS'))
+  const payload:unknown=JSON.parse(body)
+  if(!payload||typeof payload!=='object'||Array.isArray(payload))return NextResponse.json({error:'Payload must be an object'},{status:400})
+  if(['worldbank','adb','ungm'].includes(source))inboundTenderSchema.parse(payload)
+  const binding=idSchema.safeParse(configuration('INBOUND_WEBHOOK_TENANTS')[source])
+  if(!binding.success)throw new Response('Webhook source tenant is not configured',{status:503})
+  const tenantId=binding.data
+  if(!await db.tenant.findUnique({where:{id:tenantId},select:{id:true}}))throw new Response('Webhook source tenant is unavailable',{status:503})
+  try{
+    const accepted=await db.$transaction(async tx=>{
+      const webhook=await tx.inboundWebhook.create({data:{tenantId,source,eventType,eventId,signature,signatureValid:true,payloadJson:body,processedStatus:'pending'}})
+      const job=await enqueueOutbox(tx,tenantId,'inbound.process',{webhookId:webhook.id})
+      return {webhookId:webhook.id,jobId:job.id}
+    })
+    return NextResponse.json({success:true,...accepted,source,eventType,signatureValid:true,status:'queued'},{status:202})
+  }catch(error){
+    if(error&&typeof error==='object'&&'code' in error&&error.code==='P2002')return NextResponse.json({error:'Webhook event already accepted'},{status:409})
+    throw error
+  }
+})

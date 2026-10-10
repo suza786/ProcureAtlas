@@ -1,4 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -12,6 +16,8 @@ interface AuditItem {
   entityType: string
   entityId: string | null
   user: { email: string; name: string | null } | null
+  actorType?: string
+  apiKeyId?: string | null
   ipHash: string | null
   userAgent: string | null
   llmModel: string | null
@@ -23,6 +29,9 @@ interface AuditItem {
   after: object | null
   createdAt: string
 }
+
+const actorLabel = (item: AuditItem) => item.actorType === 'api_key' || item.apiKeyId
+  ? `API key ${item.apiKeyId ?? '(unknown)'}` : item.user?.email ?? 'system'
 
 const ACTION_ICONS: Record<string, React.ElementType> = {
   login_success: LogIn,
@@ -63,6 +72,8 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export function AuditLog() {
+  const { t, formatDateTime } = useTranslation()
+
   const [items, setItems] = useState<AuditItem[]>([])
   const [loading, setLoading] = useState(true)
   const [actionFilter, setActionFilter] = useState('')
@@ -71,7 +82,7 @@ export function AuditLog() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (actionFilter) params.set('action', actionFilter)
-    fetch(`/api/audit?${params.toString()}`)
+    apiFetch(`/api/audit?${params.toString()}`)
       .then(r => r.json())
       .then(d => { setItems(d.items ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -84,8 +95,7 @@ export function AuditLog() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Shield className="h-6 w-6 text-slate-700" />
-            Audit Log
-          </h1>
+            {t("Audit Log")}</h1>
           <p className="text-sm text-slate-500 mt-1">
             Every tenant action is logged — auth, LLM calls, file uploads, pursuit changes, API key usage.
           </p>
@@ -99,7 +109,7 @@ export function AuditLog() {
                 i.action,
                 i.entityType,
                 i.entityId ?? '',
-                i.user?.email ?? '',
+                actorLabel(i),
                 i.ipHash ?? '',
                 i.llmModel ?? '',
                 (i.llmInputTokens ?? 0) + (i.llmOutputTokens ?? 0),
@@ -116,8 +126,7 @@ export function AuditLog() {
           }}
           className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
-          <Download className="h-3.5 w-3.5" /> Export CSV
-        </button>
+          <Download className="h-3.5 w-3.5" /> {t("Export CSV")}</button>
       </div>
 
       {/* Filter */}
@@ -134,7 +143,7 @@ export function AuditLog() {
           <button
             onClick={() => setActionFilter('')}
             className="text-xs text-slate-500 hover:text-rose-600"
-          >Clear</button>
+          >{t("Clear")}</button>
         )}
         <span className="text-xs text-slate-500">{items.length} entries</span>
       </div>
@@ -142,20 +151,20 @@ export function AuditLog() {
       {/* Table */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading audit log...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading audit log...")}</div>
         ) : items.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">No audit entries match filter.</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("No audit entries match filter.")}</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                  <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Timestamp</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Action</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Entity</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">User</th>
+                  <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Timestamp")}</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Action")}</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Entity")}</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("User")}</th>
                   <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">LLM</th>
-                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Cost</th>
+                  <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Cost")}</th>
                   <th className="px-2 py-2"></th>
                 </tr>
               </thead>
@@ -184,7 +193,7 @@ export function AuditLog() {
                           <span className="text-slate-400 ml-1">/{item.entityId.slice(-8)}</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600">{item.user?.email ?? 'system'}</td>
+                      <td className="px-3 py-2.5 text-xs text-slate-600">{actorLabel(item)}</td>
                       <td className="px-3 py-2.5 text-xs">
                         {item.llmModel ? (
                           <div className="flex flex-col">
@@ -221,59 +230,59 @@ export function AuditLog() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-slate-900">Audit Entry Detail</h2>
+              <h2 className="text-sm font-semibold text-slate-900">{t("Audit Entry Detail")}</h2>
               <button
                 onClick={() => setSelected(null)}
                 className="text-slate-400 hover:text-slate-900 text-xs"
-              >Close ✕</button>
+              >{t("Close ✕")}</button>
             </div>
 
             <dl className="space-y-3 text-xs">
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Action</dt>
+                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Action")}</dt>
                 <dd className="font-medium text-slate-900">{selected.action}</dd>
               </div>
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Entity</dt>
+                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Entity")}</dt>
                 <dd className="font-mono text-slate-700">{selected.entityType} / {selected.entityId ?? '—'}</dd>
               </div>
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">User</dt>
-                <dd className="text-slate-700">{selected.user?.email ?? 'system'}{selected.user?.name ? ` (${selected.user.name})` : ''}</dd>
+                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("User")}</dt>
+                <dd className="text-slate-700">{actorLabel(selected)}{selected.user?.name ? ` (${selected.user.name})` : ''}</dd>
               </div>
               <div>
-                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Timestamp</dt>
+                <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Timestamp")}</dt>
                 <dd className="text-slate-700">{formatDateTime(selected.createdAt)}</dd>
               </div>
               {selected.ipHash && (
                 <div>
-                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">IP Hash</dt>
+                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("IP Hash")}</dt>
                   <dd className="font-mono text-slate-700">{selected.ipHash}</dd>
                 </div>
               )}
               {selected.userAgent && (
                 <div>
-                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">User Agent</dt>
+                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("User Agent")}</dt>
                   <dd className="text-slate-700 break-all">{selected.userAgent}</dd>
                 </div>
               )}
               {selected.llmModel && (
                 <>
                   <div className="pt-3 border-t border-slate-100">
-                    <dt className="text-[10px] uppercase tracking-wider text-violet-600 font-semibold">LLM Call</dt>
+                    <dt className="text-[10px] uppercase tracking-wider text-violet-600 font-semibold">{t("LLM Call")}</dt>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div><dt className="text-[10px] uppercase text-slate-500">Model</dt><dd className="font-medium text-violet-700">{selected.llmModel}</dd></div>
-                    <div><dt className="text-[10px] uppercase text-slate-500">Latency</dt><dd className="text-slate-700">{selected.llmLatencyMs}ms</dd></div>
-                    <div><dt className="text-[10px] uppercase text-slate-500">Input tokens</dt><dd className="text-slate-700">{selected.llmInputTokens}</dd></div>
-                    <div><dt className="text-[10px] uppercase text-slate-500">Output tokens</dt><dd className="text-slate-700">{selected.llmOutputTokens}</dd></div>
-                    <div><dt className="text-[10px] uppercase text-slate-500">Cost</dt><dd className="text-slate-700">${selected.llmCostUsd?.toFixed(4)}</dd></div>
+                    <div><dt className="text-[10px] uppercase text-slate-500">{t("Model")}</dt><dd className="font-medium text-violet-700">{selected.llmModel}</dd></div>
+                    <div><dt className="text-[10px] uppercase text-slate-500">{t("Latency")}</dt><dd className="text-slate-700">{selected.llmLatencyMs}ms</dd></div>
+                    <div><dt className="text-[10px] uppercase text-slate-500">{t("Input tokens")}</dt><dd className="text-slate-700">{selected.llmInputTokens}</dd></div>
+                    <div><dt className="text-[10px] uppercase text-slate-500">{t("Output tokens")}</dt><dd className="text-slate-700">{selected.llmOutputTokens}</dd></div>
+                    <div><dt className="text-[10px] uppercase text-slate-500">{t("Cost")}</dt><dd className="text-slate-700">${selected.llmCostUsd?.toFixed(4)}</dd></div>
                   </div>
                 </>
               )}
               {selected.after && (
                 <div>
-                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">After</dt>
+                  <dt className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("After")}</dt>
                   <dd>
                     <pre className="bg-slate-900 text-slate-100 p-2 rounded text-[10px] overflow-x-auto">
                       {JSON.stringify(selected.after, null, 2)}

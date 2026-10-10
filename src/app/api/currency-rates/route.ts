@@ -1,27 +1,26 @@
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/currency-rates — list currency rates for the tenant
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
   const rates = await db.currencyRate.findMany({
     where: { tenantId: ctx.tenantId },
-    orderBy: { quoteCurrency: 'asc' },
+    orderBy: [{ rateDate: 'desc' }, { quoteCurrency: 'asc' }],
   })
   return NextResponse.json({ items: rates })
-}
+})
 
 // POST /api/currency-rates — create or update a currency rate
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { baseCurrency, quoteCurrency, rate, source } = body as {
-    baseCurrency: string
-    quoteCurrency: string
-    rate: number
-    source?: string
-  }
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('manager')
+  const body = await readJson(req, 'currencyRate')
+  const { baseCurrency, quoteCurrency, rate, source } = body
+  const rateDate = new Date(`${body.rateDate}T00:00:00.000Z`)
 
   if (!baseCurrency || !quoteCurrency || !rate) {
     return NextResponse.json({ error: 'baseCurrency, quoteCurrency, and rate required' }, { status: 400 })
@@ -29,10 +28,11 @@ export async function POST(req: NextRequest) {
 
   const existing = await db.currencyRate.findUnique({
     where: {
-      tenantId_baseCurrency_quoteCurrency: {
+      tenantId_baseCurrency_quoteCurrency_rateDate: {
         tenantId: ctx.tenantId,
         baseCurrency,
         quoteCurrency,
+        rateDate,
       },
     },
   })
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (existing) {
     const updated = await db.currencyRate.update({
       where: { id: existing.id },
-      data: { rate, source: source ?? 'manual', rateDate: new Date() },
+      data: { rate, source: source ?? 'manual' },
     })
     return NextResponse.json(updated)
   }
@@ -52,9 +52,9 @@ export async function POST(req: NextRequest) {
       quoteCurrency,
       rate,
       source: source ?? 'manual',
-      rateDate: new Date(),
+      rateDate,
     },
   })
 
   return NextResponse.json(created, { status: 201 })
-}
+})

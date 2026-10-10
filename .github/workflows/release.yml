@@ -1,0 +1,28 @@
+name: Release verification
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    env:
+      DATABASE_URL: file:./ci.db
+      DEMO_MODE: 'false'
+      CHECKPOINT_DISABLE: '1'
+      PRISMA_HIDE_UPDATE_MESSAGE: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate
+      - run: npm run release:verify
+      - run: npm run db:deploy -- --database .private/ci-deployment.db

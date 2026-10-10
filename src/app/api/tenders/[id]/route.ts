@@ -1,12 +1,16 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { getCurrentTenant } from '@/lib/tenant'
+import { parseIds } from '@/lib/api-validation'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/tenders/[id] — Tender Digital Twin payload
-export async function GET(
+export const GET = withApiErrors(async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const ctx = await getCurrentTenant()
+  const { id } = parseIds(await params)
 
   const tender = await db.tender.findUnique({
     where: { id },
@@ -17,7 +21,7 @@ export async function GET(
       documents: true,
       amendments: { orderBy: { amendmentNo: 'asc' } },
       awards: { include: { supplier: true } },
-      alerts: { where: { tenantId: { not: undefined } }, take: 5 },
+      alerts: { where: { tenantId: ctx.tenantId }, take: 5 },
     },
   })
 
@@ -75,6 +79,7 @@ export async function GET(
     })),
     documents: tender.documents,
     amendments: tender.amendments,
+    alerts: tender.alerts,
     awards: tender.awards.map(a => ({
       id: a.id,
       supplier: a.supplier.name,
@@ -86,4 +91,4 @@ export async function GET(
       sourceUrl: a.sourceUrl,
     })),
   })
-}
+})

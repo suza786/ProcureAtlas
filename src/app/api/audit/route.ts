@@ -1,17 +1,21 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
-import { getCurrentTenant } from '@/lib/tenant'
 import { db } from '@/lib/db'
 
 // GET /api/audit — audit log for the current tenant (admin+ only in production; demo allows all)
-export async function GET(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
-  const limit = parseInt(searchParams.get('limit') ?? '50', 10)
-  const offset = parseInt(searchParams.get('offset') ?? '0', 10)
+export const GET = withApiErrors(async function GET(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const searchParams = validatedSearch(req)
+  const { limit } = pagination(searchParams, 50, 100)
+  const { offset } = pagination(searchParams)
   const action = searchParams.get('action')
   const entityType = searchParams.get('entityType')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.AuditLogWhereInput = { tenantId: ctx.tenantId }
   if (action) where.action = { contains: action }
   if (entityType) where.entityType = entityType
 
@@ -33,6 +37,8 @@ export async function GET(req: NextRequest) {
     items: items.map((a) => ({
       id: a.id,
       action: a.action,
+      actorType: a.actorType,
+      apiKeyId: a.apiKeyId,
       entityType: a.entityType,
       entityId: a.entityId,
       user: a.user ? { email: a.user.email, name: a.user.name } : null,
@@ -48,4 +54,4 @@ export async function GET(req: NextRequest) {
       createdAt: a.createdAt,
     })),
   })
-}
+})

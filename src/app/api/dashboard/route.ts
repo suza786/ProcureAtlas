@@ -1,21 +1,25 @@
+import { withApiErrors } from '@/lib/api-errors'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/dashboard — Command Center aggregate (KPIs + recent activity)
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
   if (!ctx.tenantId) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const tenant = await db.tenant.findUnique({ where: { id: ctx.tenantId } })
   const company = await db.company.findFirst({ where: { tenantId: ctx.tenantId } })
 
-  const [tenders, pursuits, alerts, awards] = await Promise.all([
+  const now = new Date()
+  const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  // Severity is stored as a string; database lexical ordering is not priority ordering.
+  const severityRank = ['critical', 'high', 'medium', 'low'] as const
+  const [tenders, pursuits, alertGroups, awards, activeTenderCount, pursuitTotals, criticalAlerts] = await Promise.all([
     db.tender.findMany({
-      where: { status: 'active' },
+      where: { status: 'active', submissionDeadline: { gte: now, lte: weekAhead } },
       select: { id: true, title: true, market: true, sector: true, valueUSD: true, submissionDeadline: true },
       orderBy: { submissionDeadline: 'asc' },
-      take: 20,
     }),
     db.pursuit.findMany({
       where: { tenantId: ctx.tenantId },
@@ -24,12 +28,13 @@ export async function GET() {
         bid: { select: { status: true } },
       },
       orderBy: { updatedAt: 'desc' },
+      take: 5,
     }),
-    db.alert.findMany({
-      where: { tenantId: ctx.tenantId, acknowledgedAt: null },
-      orderBy: { severity: 'desc' },
+    Promise.all(severityRank.map(severity => db.alert.findMany({
+      where: { tenantId: ctx.tenantId, acknowledgedAt: null, severity },
+      orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       take: 8,
-    }),
+    }))),
     db.award.findMany({
       include: {
         tender: { select: { title: true, market: true, sector: true } },
@@ -38,22 +43,29 @@ export async function GET() {
       orderBy: { awardedAt: 'desc' },
       take: 5,
     }),
+    db.tender.count({ where: { status: 'active' } }),
+    db.pursuit.groupBy({
+      by: ['stage'],
+      where: { tenantId: ctx.tenantId },
+      _count: { _all: true },
+      _sum: { estimatedValueUSD: true },
+    }),
+    db.alert.count({ where: { tenantId: ctx.tenantId, acknowledgedAt: null, severity: { in: ['critical', 'high'] } } }),
   ])
+  const alerts = alertGroups.flat().slice(0, 8)
 
   // KPIs
-  const activeTenderCount = tenders.length
-  const activePursuits = pursuits.filter(p => ['discovering', 'qualifying', 'bidding'].includes(p.stage)).length
-  const biddingPursuits = pursuits.filter(p => p.stage === 'bidding').length
-  const totalPipelineValue = pursuits.reduce((acc, p) => acc + (p.estimatedValueUSD ?? 0), 0)
-  const wonCount = pursuits.filter(p => p.stage === 'won').length
-  const lostCount = pursuits.filter(p => p.stage === 'lost').length
-  const criticalAlerts = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length
+  const stageCount = (stage: string) => pursuitTotals.find(p => p.stage === stage)?._count._all ?? 0
+  const activePursuits = stageCount('discovering') + stageCount('qualifying') + stageCount('bidding')
+  const biddingPursuits = stageCount('bidding')
+  const totalPipelineValue = pursuitTotals
+    .filter(p => ['discovering', 'qualifying', 'bidding', 'submitted'].includes(p.stage))
+    .reduce((acc, p) => acc + (p._sum.estimatedValueUSD ?? 0), 0)
+  const wonCount = stageCount('won')
+  const lostCount = stageCount('lost')
 
   // Next 7 days deadlines
-  const now = new Date()
-  const weekAhead = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
   const deadlinesThisWeek = tenders
-    .filter(t => t.submissionDeadline && t.submissionDeadline <= weekAhead)
     .map(t => ({
       id: t.id,
       title: t.title,
@@ -66,13 +78,13 @@ export async function GET() {
 
   // Pipeline distribution
   const pipelineDistribution = {
-    discovering: pursuits.filter(p => p.stage === 'discovering').length,
-    qualifying: pursuits.filter(p => p.stage === 'qualifying').length,
-    bidding: pursuits.filter(p => p.stage === 'bidding').length,
-    submitted: pursuits.filter(p => p.stage === 'submitted').length,
+    discovering: stageCount('discovering'),
+    qualifying: stageCount('qualifying'),
+    bidding: stageCount('bidding'),
+    submitted: stageCount('submitted'),
     won: wonCount,
     lost: lostCount,
-    no_bid: pursuits.filter(p => p.stage === 'no_bid').length,
+    no_bid: stageCount('no_bid'),
   }
 
   return NextResponse.json({
@@ -116,4 +128,4 @@ export async function GET() {
     })),
     generatedAt: new Date().toISOString(),
   })
-}
+})

@@ -1,9 +1,12 @@
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/notifications/preferences — list notification preferences for the current user
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
   if (!ctx.userId) {
     return NextResponse.json({ items: [] })
@@ -30,19 +33,17 @@ export async function GET() {
   }
 
   return NextResponse.json({ items: matrix })
-}
+})
 
 // PATCH /api/notifications/preferences — update preferences
-export async function PATCH(req: NextRequest) {
-  const ctx = await getCurrentTenant()
+export const PATCH = withApiErrors(async function PATCH(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('viewer')
   if (!ctx.userId) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { preferences } = body as {
-    preferences: Array<{ channel: string; eventType: string; enabled: boolean; minSeverity?: string }>
-  }
+  const body = await readJson(req, 'preferences')
+  const { preferences } = body
 
   for (const pref of preferences) {
     await db.notificationPreference.upsert({
@@ -70,4 +71,4 @@ export async function PATCH(req: NextRequest) {
   }
 
   return NextResponse.json({ success: true })
-}
+})

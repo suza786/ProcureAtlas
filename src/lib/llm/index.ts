@@ -1,3 +1,4 @@
+import { reserveProviderCall, settleProviderCall } from '../usage-meter'
 // ProcureAtlas AI — Phase 2 LLM Abstraction Layer
 //
 // Enforces every guardrail in /docs/AI_ARCHITECTURE.md:
@@ -52,8 +53,12 @@ export const RequirementExtractionSchema = z.object({
   items: z.array(z.object({
     category: z.enum(['eligibility', 'technical', 'financial', 'legal', 'experience', 'certification', 'document']),
     criterion: z.string().min(1).max(500),
-    operator: z.string().nullable(),
-    threshold: z.string().nullable(),
+    operator: z.string().max(100).nullable(),
+    threshold: z.string().max(2000).nullable(),
+    thresholdAmount: z.number().finite().min(0).max(1e12).optional(),
+    thresholdCurrency: z.string().regex(/^[A-Z]{3}$/).refine(value => Intl.supportedValuesOf('currency').includes(value), 'Unknown currency').optional(),
+    thresholdUnit: z.string().trim().min(1).max(500).optional(),
+    evaluationMetric: z.string().trim().min(1).max(500).optional(),
     isMandatory: z.boolean().default(true),
     sourceSnippet: z.string().min(1).max(1000), // must cite source text
     confidence: z.number().min(0).max(1),
@@ -122,7 +127,8 @@ interface LlmCallResult<T> {
 
 /**
  * Invoke the LLM with full guardrails. Returns validated output or a "needs review" flag.
- * Never throws — failures are returned as { success: false, error }.
+ * Quota rejection throws 429 before provider work; other failures return a review flag.
+ * Otherwise never throws — failures are returned as { success: false, error }.
  */
 async function callLlm<T>(params: LlmCallParams): Promise<LlmCallResult<T>> {
   const startTime = Date.now()
@@ -148,6 +154,8 @@ async function callLlm<T>(params: LlmCallParams): Promise<LlmCallResult<T>> {
     }
   }
 
+  const meteringInput = params.systemPrompt + '\n' + params.userPrompt
+  const reservation = await reserveProviderCall(params.tenantId, meteringInput, 1000)
   try {
     const completion = await zai.chat.completions.create({
       model,
@@ -156,11 +164,13 @@ async function callLlm<T>(params: LlmCallParams): Promise<LlmCallResult<T>> {
         { role: 'user', content: params.userPrompt },
       ],
       thinking: { type: 'disabled' },
+      max_tokens: reservation.maxOutputTokens,
       temperature: 0.2, // low temperature for extraction tasks
     })
 
     const latencyMs = Date.now() - startTime
     const content = completion?.choices?.[0]?.message?.content ?? ''
+    const tokenUsage = await settleProviderCall(reservation, completion.usage, meteringInput, content)
 
     // Extract JSON from response (LLMs sometimes wrap in ```json blocks)
     const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -236,8 +246,7 @@ async function callLlm<T>(params: LlmCallParams): Promise<LlmCallResult<T>> {
     }
 
     // Estimate tokens (rough — actual values come from API when available)
-    const inputTokens = Math.ceil(params.userPrompt.length / 4)
-    const outputTokens = Math.ceil(content.length / 4)
+    const { inputTokens, outputTokens } = tokenUsage
     const costUsd = (inputTokens + outputTokens) * 0.000002 // $2/1M tokens estimate
 
     await logAction({
@@ -305,6 +314,9 @@ CRITICAL RULES:
 4. Do NOT invent requirements. Do NOT infer requirements from the tender title or your training data.
 5. Categories: eligibility, technical, financial, legal, experience, certification, document.
 6. Return ONLY a JSON object with an "items" array. No prose, no markdown.
+7. Optional structured threshold fields may be included ONLY when the amount, currency, unit and metric are explicitly supported by the source snippet. Omit uncertain fields; never convert ambiguous threshold text into a number or infer currency from the market.
+8. Keep the original threshold text. Use a stable evaluationMetric such as annual_turnover, contract_value, years_experience or completed_projects, and an explicit thresholdUnit such as money, years or count. Use >=, <=, ==, > or < only when the comparison is explicit. Monetary amounts require an explicit three-letter currency code.
+9. Structured values are suggestions for human review. Do not output a reviewed status or claim eligibility has passed.
 
 Output schema:
 {
@@ -312,8 +324,12 @@ Output schema:
     {
       "category": "eligibility|technical|financial|legal|experience|certification|document",
       "criterion": "short description of the requirement",
-      "operator": ">=|<=|==|contains|mandatory|null",
+      "operator": ">=|<=|==|>|<|contains|mandatory|null",
       "threshold": "the threshold value as a string, or null",
+      "thresholdAmount": 100000,
+      "thresholdCurrency": "optional ISO currency code such as USD, omit if uncertain",
+      "thresholdUnit": "optional explicit unit such as money, years or count",
+      "evaluationMetric": "optional stable metric such as annual_turnover",
       "isMandatory": true|false,
       "sourceSnippet": "verbatim quote from the tender text",
       "confidence": 0.0-1.0

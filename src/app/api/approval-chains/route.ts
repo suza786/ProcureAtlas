@@ -1,11 +1,14 @@
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
+import { validateChainApprovers } from '@/lib/approval-workflow'
 
 // GET /api/approval-chains — list approval chains
-export async function GET() {
-  const ctx = await getCurrentTenant()
+export const GET = withApiErrors(async function GET() {
+  const { ctx } = await requireTenantWithRole('viewer')
   const chains = await db.approvalChain.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: { createdAt: 'asc' },
@@ -16,23 +19,19 @@ export async function GET() {
       steps: c.stepsJson ? JSON.parse(c.stepsJson) : [],
     })),
   })
-}
+})
 
 // POST /api/approval-chains — create an approval chain
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { name, triggerType, slaHours, steps } = body as {
-    name: string
-    triggerType: string
-    slaHours?: number
-    steps: Array<{ order: number; role: string; approverEmail?: string; autoApprove?: boolean }>
-  }
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const body = await readJson(req, 'chainCreate')
+  const { name, triggerType, slaHours, steps } = body
 
   if (!name || !triggerType || !steps || steps.length === 0) {
     return NextResponse.json({ error: 'name, triggerType, and steps[] required' }, { status: 400 })
   }
 
+  await validateChainApprovers(db, ctx.tenantId, steps)
   const chain = await db.approvalChain.create({
     data: {
       tenantId: ctx.tenantId,
@@ -55,19 +54,13 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(chain, { status: 201 })
-}
+})
 
 // PATCH /api/approval-chains — update a chain
-export async function PATCH(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { id, name, isActive, slaHours, steps } = body as {
-    id: string
-    name?: string
-    isActive?: boolean
-    slaHours?: number
-    steps?: Array<{ order: number; role: string; approverEmail?: string; autoApprove?: boolean }>
-  }
+export const PATCH = withApiErrors(async function PATCH(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const body = await readJson(req, 'chainUpdate')
+  const { id, name, isActive, slaHours, steps } = body
 
   const chain = await db.approvalChain.findFirst({
     where: { id, tenantId: ctx.tenantId },
@@ -77,6 +70,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updates: Record<string, unknown> = {}
+  if (steps) await validateChainApprovers(db, ctx.tenantId, steps)
   if (name) updates.name = name
   if (isActive !== undefined) updates.isActive = isActive
   if (slaHours) updates.slaHours = slaHours
@@ -101,4 +95,4 @@ export async function PATCH(req: NextRequest) {
   })
 
   return NextResponse.json(updated)
-}
+})

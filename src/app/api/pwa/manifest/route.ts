@@ -1,9 +1,10 @@
+import { withApiErrors } from '@/lib/api-errors'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/pwa/manifest — PWA manifest.json for the current tenant
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
   const ctx = await getCurrentTenant()
 
   let pwaSettings = await db.pwaSettings.findUnique({ where: { tenantId: ctx.tenantId } })
@@ -42,4 +43,4 @@ export async function GET() {
     lang: 'en',
     dir: 'ltr',
   })
-}
+})

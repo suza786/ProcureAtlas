@@ -1,9 +1,12 @@
+import { pagination, validatedSearch } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant, requireTenantWithRole } from '@/lib/tenant'
+import { requireTenantWithRole } from '@/lib/tenant'
 
 // GET /api/admin/users — list users in the current tenant (manager+ only)
-export async function GET() {
+export const GET = withApiErrors(async function GET(req: Request) {
+  const { limit, offset } = pagination(validatedSearch(req))
   const { ctx } = await requireTenantWithRole('manager')
 
   const users = await db.user.findMany({
@@ -21,6 +24,7 @@ export async function GET() {
       createdAt: true,
     },
     orderBy: { createdAt: 'asc' },
+    take: limit, skip: offset,
   })
 
   return NextResponse.json({
@@ -29,4 +33,4 @@ export async function GET() {
       isLocked: u.lockedUntil ? u.lockedUntil > new Date() : false,
     })),
   })
-}
+})

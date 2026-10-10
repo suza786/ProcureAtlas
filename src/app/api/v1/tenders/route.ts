@@ -1,11 +1,17 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 import { logAction } from '@/lib/auth'
 
 // GET /api/v1/tenders — public API: search tenders
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -18,15 +24,15 @@ export async function GET(req: NextRequest) {
     return res
   }
 
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const market = searchParams.get('market')
   const sector = searchParams.get('sector')
   const status = searchParams.get('status') ?? 'active'
   const search = searchParams.get('q')
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '20', 10), 100)
-  const offset = parseInt(searchParams.get('offset') ?? '0', 10)
+  const { limit } = pagination(searchParams, 20, 100)
+  const { offset } = pagination(searchParams)
 
-  const where: Record<string, unknown> = {}
+  const where: Prisma.TenderWhereInput = {}
   if (market) where.market = market
   if (sector) where.sector = sector
   if (status) where.status = status
@@ -57,11 +63,11 @@ export async function GET(req: NextRequest) {
   // Log API usage
   await logAction({
     tenantId: authResult.tenantId ?? 'unknown',
-    userId: authResult.apiKeyId,
+    apiKeyId: authResult.apiKeyId,
     action: 'api_v1_tenders_list',
     entityType: 'api',
     afterJson: { market, sector, status, limit, offset, resultCount: items.length },
-    llmModel: null,
+    llmModel: undefined,
     request: req,
   })
 
@@ -74,4 +80,4 @@ export async function GET(req: NextRequest) {
   })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})

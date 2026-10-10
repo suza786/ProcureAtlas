@@ -1,10 +1,13 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 
 // GET /api/v1/suppliers — public API: list suppliers
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -19,7 +22,7 @@ export async function GET(req: NextRequest) {
   const suppliers = await db.organization.findMany({
     where: { orgType: 'supplier' },
     include: {
-      supplierProfile: { select: { totalAwards: true, totalAwardValueUSD: true, isCompetitor: true, isPartner: true } },
+      supplierProfile: { select: { totalAwards: true, totalAwardValueUSD: true } },
     },
     take: 100,
     orderBy: { name: 'asc' },
@@ -35,4 +38,4 @@ export async function GET(req: NextRequest) {
   })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})

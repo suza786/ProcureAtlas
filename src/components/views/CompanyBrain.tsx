@@ -1,4 +1,11 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
+import { WorkflowDialog } from '@/components/ui/workflow-dialog'
+import { CapabilityEditor } from './CapabilityEditor'
+import { uploadScanStatus, uploadPollDelay } from '@/lib/upload-status'
 
 import { useEffect, useState } from 'react'
 import {
@@ -109,19 +116,21 @@ const EVIDENCE_CATEGORY_LABEL: Record<string, string> = {
 }
 
 export function CompanyBrain() {
+  const { t, formatDate } = useTranslation()
+
   const [data, setData] = useState<CompanyData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showUpload, setShowUpload] = useState(false)
 
   useEffect(() => {
-    fetch('/api/company')
+    apiFetch('/api/company')
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading Company Brain...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Company profile not found.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading Company Brain...")}</div>
+  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Company profile not found.")}</div>
 
   return (
     <div className="space-y-6">
@@ -146,29 +155,31 @@ export function CompanyBrain() {
 
       {/* Stats grid */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatTile icon={FileCheck2} label="Evidence Items" value={data.stats.evidenceCount} sub={`${data.stats.verifiedEvidenceCount} verified`} tone="emerald" />
-        <StatTile icon={Shield} label="Certifications" value={data.stats.certificationCount} sub={`${data.expiryBuckets.expired} expired`} tone="violet" />
-        <StatTile icon={FolderKanban} label="Project Refs" value={data.stats.projectReferenceCount} sub="Past performance" tone="sky" />
-        <StatTile icon={Users} label="Employees" value={data.stats.employeeCount} sub="On file" tone="amber" />
-        <StatTile icon={TrendingUp} label="Annual Turnover" value={formatUSD(data.annualTurnoverUSD)} sub="USD" tone="slate" />
+        <StatTile icon={FileCheck2} label={t("Evidence Items")} value={data.stats.evidenceCount} sub={`${data.stats.verifiedEvidenceCount} verified`} tone="emerald" />
+        <StatTile icon={Shield} label={t("Certifications")} value={data.stats.certificationCount} sub={`${data.expiryBuckets.expired} expired`} tone="violet" />
+        <StatTile icon={FolderKanban} label={t("Project Refs")} value={data.stats.projectReferenceCount} sub="Past performance" tone="sky" />
+        <StatTile icon={Users} label={t("Employees")} value={data.stats.employeeCount} sub="On file" tone="amber" />
+        <StatTile icon={TrendingUp} label={t("Annual Turnover")} value={formatUSD(data.annualTurnoverUSD)} sub="USD" tone="slate" />
       </div>
+
+      <CapabilityEditor companyId={data.id} evidence={data.evidence} />
 
       {/* Company metadata */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Company Profile</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Company Profile")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
-          <Field icon={Building2} label="Registration No." value={data.registrationNo} />
-          <Field icon={FileCheck2} label="Tax ID" value={data.taxId} />
-          <Field icon={Globe} label="Website" value={data.website ? (
+          <Field icon={Building2} label={t("Registration No.")} value={data.registrationNo} />
+          <Field icon={FileCheck2} label={t("Tax ID")} value={data.taxId} />
+          <Field icon={Globe} label={t("Website")} value={data.website ? (
             <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:text-sky-900 flex items-center gap-1">
               {data.website} <ExternalLink className="h-3 w-3" />
             </a>
           ) : '—'} />
-          <Field icon={Building2} label="Founded" value={data.foundedYear ? `${data.foundedYear} (${new Date().getFullYear() - data.foundedYear} years)` : '—'} />
-          <Field icon={Users} label="Employees" value={data.employeeCount?.toString() ?? '—'} />
-          <Field icon={Building2} label="City" value={data.city ?? '—'} />
-          <Field icon={Globe} label="Country" value={data.country} />
-          <Field icon={TrendingUp} label="Annual Turnover" value={formatUSD(data.annualTurnoverUSD)} />
+          <Field icon={Building2} label={t("Founded")} value={data.foundedYear ? `${data.foundedYear} (${new Date().getFullYear() - data.foundedYear} years)` : '—'} />
+          <Field icon={Users} label={t("Employees")} value={data.employeeCount?.toString() ?? '—'} />
+          <Field icon={Building2} label={t("City")} value={data.city ?? '—'} />
+          <Field icon={Globe} label={t("Country")} value={data.country} />
+          <Field icon={TrendingUp} label={t("Annual Turnover")} value={formatUSD(data.annualTurnoverUSD)} />
         </div>
         {data.description && (
           <div className="mt-4 pt-4 border-t border-slate-100">
@@ -179,7 +190,7 @@ export function CompanyBrain() {
 
       {/* Capability map */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Capability Map</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Capability Map")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {Object.entries(data.capabilityMap).map(([cat, count]) => (
             <div key={cat} className="rounded-md border border-slate-200 p-2.5">
@@ -200,8 +211,7 @@ export function CompanyBrain() {
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <Award className="h-4 w-4 text-violet-600" />
-              Certifications
-            </h2>
+              {t("Certifications")}</h2>
             <ExpiryBuckets buckets={data.expiryBuckets} />
           </div>
           <div className="divide-y divide-slate-100">
@@ -219,7 +229,7 @@ export function CompanyBrain() {
                         {c.certificateNo && ` · #${c.certificateNo}`}
                       </p>
                       <p className="text-[10px] text-slate-400 mt-0.5">
-                        Issued: {formatDate(c.issuedAt)}
+                        {t("Issued:")}{formatDate(c.issuedAt)}
                         {c.expiresAt && ` · Expires: ${formatDate(c.expiresAt)}`}
                       </p>
                     </div>
@@ -253,8 +263,7 @@ export function CompanyBrain() {
           <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <FolderKanban className="h-4 w-4 text-sky-600" />
-              Project References
-            </h2>
+              {t("Project References")}</h2>
             <span className="text-xs text-slate-500">{data.projectReferences.length} on file</span>
           </div>
           <div className="divide-y divide-slate-100">
@@ -293,27 +302,25 @@ export function CompanyBrain() {
           <div>
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
               <FileCheck2 className="h-4 w-4 text-emerald-600" />
-              Evidence Library
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">Every factual company claim is linked to verifiable evidence.</p>
+              {t("Evidence Library")}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{t("Every factual company claim is linked to verifiable evidence.")}</p>
           </div>
           <button
             onClick={() => setShowUpload(true)}
             className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
           >
-            <Plus className="h-3.5 w-3.5" /> Add Evidence
-          </button>
+            <Plus className="h-3.5 w-3.5" /> {t("Add Evidence")}</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Title</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Category</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Issuer</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Issued</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Expires</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Title")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Category")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Issuer")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Issued")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Expires")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -353,8 +360,7 @@ export function CompanyBrain() {
         <div className="border-b border-slate-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <Users className="h-4 w-4 text-amber-600" />
-            Key Personnel
-          </h2>
+            {t("Key Personnel")}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
           {data.employees.map(emp => (
@@ -370,7 +376,7 @@ export function CompanyBrain() {
               </div>
               {emp.qualifications && (
                 <p className="text-xs text-slate-600 mt-2">
-                  <span className="text-slate-400">Qualifications:</span> {emp.qualifications}
+                  <span className="text-slate-400">{t("Qualifications:")}</span> {emp.qualifications}
                 </p>
               )}
               <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400">
@@ -389,7 +395,7 @@ export function CompanyBrain() {
           onUploaded={() => {
             setShowUpload(false)
             // Reload data
-            fetch('/api/company').then(r => r.json()).then(d => setData(d))
+            apiFetch('/api/company').then(r => r.json()).then(d => setData(d)).catch(() => {})
           }}
         />
       )}
@@ -398,6 +404,8 @@ export function CompanyBrain() {
 }
 
 function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded: () => void }) {
+  const { t } = useTranslation()
+
   const [file, setFile] = useState<File | null>(null)
   const [category, setCategory] = useState('certification')
   const [title, setTitle] = useState('')
@@ -406,6 +414,37 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<{ id: string; virusScanResult: string | null; virusScannedAt: string | null; textExtracted?: string | null } | null>(null)
+  const scanStatus = uploadedFile ? uploadScanStatus(uploadedFile.virusScanResult, uploadedFile.virusScannedAt) : null
+  const [pollGeneration, setPollGeneration] = useState(0)
+  const [pollPaused, setPollPaused] = useState(false)
+
+  useEffect(() => {
+    if (!uploadedFile?.id || !scanStatus?.poll) return
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout>
+    let attempts = 0
+    const schedule = () => {
+      if (controller.signal.aborted) return
+      const delay = uploadPollDelay(attempts)
+      if (delay === null) { setPollPaused(true); return }
+      timer = setTimeout(poll, delay)
+    }
+    const poll = async () => {
+      attempts++
+      try {
+        const response = await apiFetch(`/api/uploads/${uploadedFile.id}`, { signal: controller.signal })
+        if (!response.ok) throw new Error('Could not refresh file processing status.')
+        const metadata = await response.json()
+        if (!controller.signal.aborted) setUploadedFile(metadata)
+        if (uploadScanStatus(metadata.virusScanResult, metadata.virusScannedAt).poll) schedule()
+      } catch {
+        schedule()
+      }
+    }
+    schedule()
+    return () => { controller.abort(); clearTimeout(timer) }
+  }, [uploadedFile?.id, scanStatus?.poll, pollGeneration])
 
   const submit = async () => {
     if (!file || !title) {
@@ -415,18 +454,23 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
     setUploading(true)
     setError(null)
     try {
-      // Step 1: upload file
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('category', 'evidence')
-      const uploadRes = await fetch('/api/uploads', { method: 'POST', body: formData })
-      const uploadData = await uploadRes.json()
-      if (!uploadRes.ok) {
-        setError(uploadData.error ?? 'Upload failed')
-        return
+      // Reuse the saved upload when retrying a failed evidence-link request.
+      let uploadData = uploadedFile
+      if (!uploadData) {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('category', 'evidence')
+        const uploadRes = await apiFetch('/api/uploads', { method: 'POST', body: formData })
+        const result = await uploadRes.json()
+        if (!uploadRes.ok) {
+          setError(result.error ?? 'Upload failed')
+          return
+        }
+        uploadData = result
+        setUploadedFile(uploadData)
       }
       // Step 2: create evidence linked to file
-      const evRes = await fetch('/api/company/evidence', {
+      const evRes = await apiFetch('/api/company/evidence', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -434,7 +478,7 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           title,
           issuer: issuer || undefined,
           expiresAt: expiresAt || undefined,
-          fileUploadId: uploadData.id,
+          fileUploadId: uploadData!.id,
         }),
       })
       if (!evRes.ok) {
@@ -442,35 +486,21 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
         setError(evData.error ?? 'Evidence creation failed')
         return
       }
-      setSuccess('Evidence uploaded and linked successfully.')
-      setTimeout(() => onUploaded(), 1200)
+      setSuccess('Evidence uploaded and linked. File access will become available after processing succeeds.')
     } catch (e) {
-      setError('Network error: ' + (e as Error).message)
+      setError((e as Error).message)
     } finally {
       setUploading(false)
     }
   }
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-lg bg-white p-6"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-900">Add Evidence</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-900">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
+    <WorkflowDialog title={t("Add Evidence")} description="Upload a document and link it to your company evidence." onClose={onClose} busy={uploading}>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Title *</label>
+            <label htmlFor="evidence-title" className="block text-xs font-medium text-slate-700 mb-1">{t("Title *")}</label>
             <input
+              id="evidence-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -480,8 +510,9 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Category</label>
+            <label htmlFor="evidence-category" className="block text-xs font-medium text-slate-700 mb-1">{t("Category")}</label>
             <select
+              id="evidence-category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 bg-white"
@@ -493,8 +524,9 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Issuer</label>
+            <label htmlFor="evidence-issuer" className="block text-xs font-medium text-slate-700 mb-1">{t("Issuer")}</label>
             <input
+              id="evidence-issuer"
               type="text"
               value={issuer}
               onChange={(e) => setIssuer(e.target.value)}
@@ -504,8 +536,9 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Expires (optional)</label>
+            <label htmlFor="evidence-expiry" className="block text-xs font-medium text-slate-700 mb-1">{t("Expires (optional)")}</label>
             <input
+              id="evidence-expiry"
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
@@ -514,10 +547,12 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">File * (PDF, PNG, JPG, TXT, DOCX, XLSX — max 25 MB)</label>
+            <label htmlFor="evidence-file" className="block text-xs font-medium text-slate-700 mb-1">File * (PDF, PNG, JPG, TXT, DOCX, XLSX — max 25 MB)</label>
             <div className="flex items-center gap-2">
               <input
+                id="evidence-file"
                 type="file"
+                disabled={!!uploadedFile}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 accept=".pdf,.png,.jpg,.jpeg,.txt,.docx,.xlsx"
                 className="text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-900 file:text-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:cursor-pointer"
@@ -531,33 +566,43 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           {error && (
-            <div className="text-xs text-rose-700 bg-rose-500/5 border border-rose-500/30 rounded-md p-2">
+            <div role="alert" className="text-xs text-rose-700 bg-rose-500/5 border border-rose-500/30 rounded-md p-2">
               {error}
             </div>
           )}
           {success && (
-            <div className="text-xs text-emerald-700 bg-emerald-500/5 border border-emerald-500/30 rounded-md p-2 flex items-center gap-1.5">
+            <div role="status" className="text-xs text-emerald-700 bg-emerald-500/5 border border-emerald-500/30 rounded-md p-2 flex items-center gap-1.5">
               <CheckCircle2 className="h-3.5 w-3.5" /> {success}
+            </div>
+          )}
+          {scanStatus && uploadedFile && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700" role="status" aria-live="polite">
+              <p>{scanStatus.message}</p>
+              {pollPaused && scanStatus.poll && <div className="mt-2"><p>{t("Automatic checks paused. Your file remains quarantined.")}</p><button type="button" className="mt-1 underline" onClick={() => { setPollPaused(false); setPollGeneration(value => value + 1) }}>{t("Check processing status again")}</button></div>}
+              {scanStatus.downloadable && (
+                <a href={`/api/uploads/${uploadedFile.id}?download=true`} className="mt-2 inline-block font-medium underline">{t("Download verified file")}</a>
+              )}
+              {scanStatus.downloadable && uploadedFile.textExtracted && <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap text-[11px]">{uploadedFile.textExtracted.slice(0, 500)}</pre>}
             </div>
           )}
 
           <div className="flex gap-2 pt-2">
             <button
               onClick={submit}
-              disabled={uploading || !file || !title}
+              disabled={uploading || !!success || !file || !title}
               className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
             >
               {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-              {uploading ? 'Uploading...' : 'Upload'}
+              {uploading ? t("Uploading...") : t("Upload")}
             </button>
             <button
-              onClick={onClose}
+              disabled={uploading}
+              onClick={success ? onUploaded : onClose}
               className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5"
-            >Cancel</button>
+            >{success ? t("Done") : t("Cancel")}</button>
           </div>
         </div>
-      </div>
-    </div>
+    </WorkflowDialog>
   )
 }
 

@@ -1,13 +1,16 @@
 // ProcureAtlas AI — Deterministic seed script (Phase 2)
-// Run: bun run scripts/seed.ts
-// Idempotent: wipes tenant-scoped tables, then inserts fresh demo data.
+// Run only against SEED_DEMO_DATABASE_URL=file:<absolute-path>/demo.db.
+// One transaction: refresh only atlas-demo and upsert stable shared fixtures.
 // All data is FICTIONAL but realistic — designed to exercise every module.
 
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
+import { requireDemoSeedDatabase, fixtureClient, clearDemoTenant } from '../src/lib/seed-safety.ts'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
-const prisma = new PrismaClient()
+const databaseUrl = requireDemoSeedDatabase(process.env.SEED_DEMO_DATABASE_URL, process.env.NODE_ENV)
+const client = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+let prisma: Prisma.TransactionClient
 
 const NOW = new Date()
 const DAY = 24 * 60 * 60 * 1000
@@ -17,53 +20,7 @@ const daysAgo = (n: number) => new Date(NOW.getTime() - n * DAY)
 async function main() {
   console.log('🌱 Seeding ProcureAtlas AI demo data...')
 
-  // Clean (order matters for FK constraints)
-  await prisma.bidCostEstimate.deleteMany()
-  await prisma.currencyRate.deleteMany()
-  await prisma.notificationPreference.deleteMany()
-  await prisma.webhookDelivery.deleteMany()
-  await prisma.webhookEndpoint.deleteMany()
-  await prisma.proposalVersion.deleteMany()
-  await prisma.proposalSection.deleteMany()
-  await prisma.proposal.deleteMany()
-  await prisma.approvalChain.deleteMany()
-  await prisma.invoice.deleteMany()
-  await prisma.usageMetric.deleteMany()
-  await prisma.subscription.deleteMany()
-  await prisma.partnerSuggestion.deleteMany()
-  await prisma.supplierProfile.deleteMany()
-  await prisma.buyerProfile.deleteMany()
-  await prisma.notification.deleteMany()
-  await prisma.apiKey.deleteMany()
-  await prisma.connectorRun.deleteMany()
-  await prisma.llmExtraction.deleteMany()
-  await prisma.fileUpload.deleteMany()
-  await prisma.session.deleteMany()
-  await prisma.auditLog.deleteMany()
-  await prisma.alert.deleteMany()
-  await prisma.outcome.deleteMany()
-  await prisma.approval.deleteMany()
-  await prisma.task.deleteMany()
-  await prisma.complianceItem.deleteMany()
-  await prisma.bid.deleteMany()
-  await prisma.pursuit.deleteMany()
-  await prisma.employee.deleteMany()
-  await prisma.projectReference.deleteMany()
-  await prisma.certification.deleteMany()
-  await prisma.evidence.deleteMany()
-  await prisma.company.deleteMany()
-  await prisma.award.deleteMany()
-  await prisma.amendment.deleteMany()
-  await prisma.tenderDocument.deleteMany()
-  await prisma.requirement.deleteMany()
-  await prisma.lot.deleteMany()
-  await prisma.tender.deleteMany()
-  await prisma.buyer.deleteMany()
-  await prisma.procurementAuthority.deleteMany()
-  await prisma.organization.deleteMany()
-  await prisma.user.deleteMany()
-  await prisma.tenant.deleteMany()
-  await prisma.dataSource.deleteMany()
+  await clearDemoTenant(prisma)
 
   // ---------- Data Source Registry ----------
   const sources = [
@@ -581,9 +538,9 @@ async function main() {
   // ---------- Pursuits ----------
   // Pick the first 4 active tenders for pursuits in different stages
   const activeTenders = await prisma.tender.findMany({
-    where: { status: 'active' },
+    where: { status: 'active', id: { in: createdTenders.map(tender => tender.id) } },
     take: 4,
-    orderBy: { publishedAt: 'desc' },
+    orderBy: [{ publishedAt: 'desc' }, { id: 'asc' }],
   })
 
   const pursuitStages = ['qualifying', 'bidding', 'discovering', 'bidding'] as const
@@ -1255,6 +1212,21 @@ async function main() {
     }
   }
 
+  const demoProposals = await prisma.proposal.findMany({ where: { tenantId: tenant.id } })
+  const workflowChains = await prisma.approvalChain.findMany({ where: { tenantId: tenant.id, isActive: true, triggerType: { in: ['submission', 'pricing', 'legal'] } } })
+  for (const proposal of demoProposals) {
+    await prisma.approval.deleteMany({ where: { tenantId: tenant.id, proposalId: proposal.id, triggerType: { in: ['submission', 'pricing', 'legal'] } } })
+    for (const chain of workflowChains) {
+      const steps = JSON.parse(chain.stepsJson ?? '[]') as Array<{ order: number; role: string; approverEmail?: string }>
+      for (const step of steps) {
+        const assigned = step.approverEmail ? await prisma.user.findFirst({ where: { tenantId: tenant.id, email: step.approverEmail } }) : null
+        await prisma.approval.create({ data: { tenantId: tenant.id, pursuitId: proposal.pursuitId, proposalId: proposal.id,
+          chainId: chain.id, triggerType: chain.triggerType, stepOrder: step.order, approverRole: step.role,
+          approverId: assigned?.id ?? null, requestedBy: ownerUser.id, slaDueAt: daysFromNow(3) } })
+      }
+    }
+  }
+
   console.log('✅ Seed complete.')
   console.log(`   Tenant: ${tenant.id}`)
   console.log(`   Company: ${company.id}`)
@@ -1266,11 +1238,14 @@ async function main() {
   console.log(`   Phase 6: 9 expansion markets + SCIM config + 6 analytics snapshots + 5 expansion tenders`)
 }
 
-main()
+client.$transaction(async tx => {
+  prisma = fixtureClient(tx)
+  await main()
+}, { timeout: 60000, maxWait: 10000 })
   .catch((e) => {
     console.error('Seed failed:', e)
-    process.exit(1)
+    process.exitCode = 1
   })
   .finally(async () => {
-    await prisma.$disconnect()
+    await client.$disconnect()
   })

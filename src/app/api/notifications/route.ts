@@ -1,15 +1,20 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { readJson, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/notifications — list notifications for the current tenant/user
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const unreadOnly = searchParams.get('unread') === 'true'
-  const limit = parseInt(searchParams.get('limit') ?? '20', 10)
+  const { limit, offset } = pagination(searchParams, 20, 100)
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.NotificationWhereInput = { tenantId: ctx.tenantId }
   if (unreadOnly) where.readAt = null
   if (ctx.userId) {
     where.OR = [
@@ -21,17 +26,17 @@ export async function GET(req: NextRequest) {
   const items = await db.notification.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    take: limit,
+    take: limit, skip: offset,
   })
 
   return NextResponse.json({ items })
-}
+})
 
 // PATCH /api/notifications/[id] — mark as read
-export async function PATCH(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { id, all } = body as { id?: string; all?: boolean }
+export const PATCH = withApiErrors(async function PATCH(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('viewer')
+  const body = await readJson(req, 'notification')
+  const { id, all } = body
 
   if (all) {
     await db.notification.updateMany({
@@ -46,9 +51,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   await db.notification.updateMany({
-    where: { id, tenantId: ctx.tenantId },
+    where: { id, tenantId: ctx.tenantId, OR: [{ userId: ctx.userId }, { userId: null }] },
     data: { readAt: new Date() },
   })
 
   return NextResponse.json({ success: true })
-}
+})

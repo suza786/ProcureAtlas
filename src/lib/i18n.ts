@@ -3,6 +3,7 @@
 // next-intl is available for production; this approach keeps the sandbox simple.
 
 export type Locale = 'en' | 'bn'
+import { viewTranslations } from './view-translations'
 
 export const translations: Record<Locale, Record<string, string>> = {
   en: {
@@ -167,5 +168,40 @@ export const translations: Record<Locale, Record<string, string>> = {
 }
 
 export function t(locale: Locale, key: string): string {
-  return translations[locale]?.[key] ?? translations.en[key] ?? key
+  const resolved = Object.hasOwn(translations.en, key) ? key : phraseKeys.get(key) ?? key
+  return translations[locale]?.[resolved] ?? translations.en[resolved] ?? key
 }
+
+const releaseCopy: Record<string, [string, string]> = {
+  'shell.demoMode': ['Demo mode', 'ডেমো মোড'], 'shell.notSignedIn': ['Not signed in', 'সাইন ইন করা নেই'],
+  'shell.openMenu': ['Open module menu', 'মডিউল মেনু খুলুন'], 'shell.modules': ['Modules', 'মডিউল'],
+  'shell.chooseModule': ['Choose a module', 'একটি মডিউল বেছে নিন'], 'shell.breadcrumb': ['Current location', 'বর্তমান অবস্থান'],
+  'shell.switchLanguage': ['Switch language', 'ভাষা পরিবর্তন করুন'], 'shell.bidRoom': ['Bid Room', 'বিড রুম'],
+  'shell.tender': ['Tender details', 'দরপত্রের বিবরণ'], 'shell.signIn': ['Sign in', 'সাইন ইন'],
+  'shell.loadingModule': ['Loading module…', 'মডিউল লোড হচ্ছে…'], 'shell.skipContent': ['Skip to main content', 'মূল বিষয়বস্তুতে যান'],
+  'search.placeholder': ['Search tenders, buyers, suppliers and your workspace', 'দরপত্র, ক্রেতা, সরবরাহকারী ও আপনার কর্মক্ষেত্রে খুঁজুন'],
+  'search.minLength': ['Enter at least two characters', 'অন্তত দুটি অক্ষর লিখুন'], 'search.error': ['Search failed. Try again.', 'অনুসন্ধান ব্যর্থ হয়েছে। আবার চেষ্টা করুন।'],
+  'search.results': ['Search results', 'অনুসন্ধানের ফলাফল'], 'search.empty': ['No results found', 'কোনো ফলাফল পাওয়া যায়নি'], 'search.retry': ['Retry search', 'আবার অনুসন্ধান করুন'],
+  'search.type.tender': ['Tender', 'দরপত্র'], 'search.type.buyer': ['Buyer', 'ক্রেতা'], 'search.type.supplier': ['Supplier', 'সরবরাহকারী'],
+  'search.type.award': ['Award', 'চুক্তি প্রদান'], 'search.type.company': ['Company', 'কোম্পানি'], 'search.type.pursuit': ['Pursuit', 'বিড উদ্যোগ'],
+  'analytics.loadFailed': ['Could not load analytics.', 'বিশ্লেষণ লোড করা যায়নি।'],
+  'analytics.observedDescription': ['Real daily observations from your tenant. Historical data appears as snapshots are collected.', 'আপনার প্রতিষ্ঠানের প্রকৃত দৈনিক পর্যবেক্ষণ। স্ন্যাপশট সংগ্রহের সঙ্গে ঐতিহাসিক তথ্য যুক্ত হবে।'],
+  'analytics.dailyUtc': ['Daily observations (UTC)', 'দৈনিক পর্যবেক্ষণ (UTC)'], 'analytics.latestWindow': ['Latest reporting window', 'সর্বশেষ প্রতিবেদনের সময়সীমা'],
+  'analytics.providerWindow': ['Provider usage in the last 30 days', 'গত ৩০ দিনে সেবাদাতার ব্যবহার'], 'analytics.wonValue': ['Won value', 'জয়ী চুক্তির মূল্য'],
+  'analytics.calls30d': ['Provider calls (30d)', 'সেবাদাতাকে অনুরোধ (৩০ দিন)'], 'analytics.cost30d': ['Provider cost (30d)', 'সেবাদাতার খরচ (৩০ দিন)'],
+  'analytics.unknown': ['Unknown', 'অজানা'], 'analytics.pendingProviderCalls': ['Unsettled provider calls', 'অসম্পন্ন হিসাবের অনুরোধ'],
+  'analytics.emptyHistory': ['No observed history yet. Start the worker to collect daily snapshots.', 'এখনো পর্যবেক্ষণের ইতিহাস নেই। দৈনিক স্ন্যাপশট সংগ্রহ করতে ওয়ার্কার চালু করুন।'],
+  'analytics.pipelineUsdK': ['Pipeline (USD thousands)', 'পাইপলাইন (হাজার মার্কিন ডলার)'], 'analytics.wonUsdK': ['Won (USD thousands)', 'জয়ী (হাজার মার্কিন ডলার)'],
+  'analytics.providerCalls': ['Provider calls', 'সেবাদাতাকে অনুরোধ'], 'analytics.verifiedCoverage': ['Verified evidence coverage', 'যাচাইকৃত প্রমাণের পরিধি'],
+  'analytics.cycleDays': ['Bid cycle days', 'বিড চক্রের দিন'], 'analytics.proposalWords': ['Proposal words', 'প্রস্তাবের শব্দ'], 'analytics.wordCount': ['Word count', 'শব্দসংখ্যা'],
+  'analytics.dailySnapshots': ['Observed daily snapshots', 'পর্যবেক্ষিত দৈনিক স্ন্যাপশট'], 'analytics.dateUtc': ['Observation date (UTC)', 'পর্যবেক্ষণের তারিখ (UTC)'],
+  'analytics.observedAtUtc': ['Observed at (UTC)', 'পর্যবেক্ষণের সময় (UTC)'], 'analytics.active': ['Active', 'সক্রিয়'], 'analytics.bidding': ['Bidding', 'বিড প্রস্তুতি'],
+  'analytics.won': ['Won', 'জয়ী'], 'analytics.lost': ['Lost', 'হারা'], 'analytics.tokens': ['Tokens', 'টোকেন'], 'analytics.cost': ['Cost', 'খরচ'],
+}
+for (const [key, [en, bn]] of Object.entries(releaseCopy)) { translations.en[key] = en; translations.bn[key] = bn }
+translations.en['analytics.winRateTrend'] = 'Win rate trend'
+translations.bn['analytics.winRateTrend'] = 'জয়ের হারের প্রবণতা'
+for (const [en, bn] of Object.entries(viewTranslations)) { translations.en[en] = en; translations.bn[en] = bn }
+translations.en['shell.timeZone'] = 'Display time zone'
+translations.bn['shell.timeZone'] = 'প্রদর্শনের সময় অঞ্চল'
+const phraseKeys = new Map(Object.entries(translations.en).map(([key, value]) => [value, key]))

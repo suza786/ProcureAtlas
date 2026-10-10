@@ -1,82 +1,30 @@
+import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
+import { validatedSearch, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { normalizeAward } from '@/lib/financial-calculations'
+import { cachedCatalog, organizationAwardStats, summaryStats, supplierFacets } from '@/lib/catalog-analytics'
 
-// GET /api/competitors — list supplier organizations flagged as competitors
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const search = searchParams.get('search')
-
-  const where: Record<string, unknown> = { orgType: 'supplier' }
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { country: { contains: search } },
-    ]
-  }
-
-  const suppliers = await db.organization.findMany({
-    where,
-    include: {
-      supplierProfile: true,
-      awards: {
-        include: {
-          tender: { select: { title: true, sector: true, market: true, valueUSD: true } },
-        },
-        orderBy: { awardedAt: 'desc' },
-        take: 5,
-      },
-    },
-    take: 50,
-    orderBy: { name: 'asc' },
+export const GET = withApiErrors(async function GET(req: NextRequest) {
+  const ctx = await getCurrentTenant()
+  const params = validatedSearch(req)
+  const search = params.get('search') ?? ''
+  const { limit, offset } = pagination(params)
+  const result = await cachedCatalog(`suppliers:${JSON.stringify({ search, limit, offset })}`, async () => {
+    const where: Prisma.OrganizationWhereInput = { orgType: 'supplier', ...(search ? { OR: [{ name: { contains: search } }, { country: { contains: search } }] } : {}) }
+    const [suppliers, total] = await Promise.all([
+      db.organization.findMany({ where, take: limit, skip: offset, orderBy: [{ name: 'asc' }, { id: 'asc' }], include: { awards: { take: 3, orderBy: [{ awardedAt: 'desc' }, { id: 'asc' }], include: { tender: { select: { title: true, sector: true, market: true, valueUSD: true } } } } } }),
+      db.organization.count({ where }),
+    ])
+    const ids = suppliers.map(s => s.id)
+    const [stats, facets] = await Promise.all([organizationAwardStats(ids, 'supplier'), supplierFacets(ids)])
+    return { total, items: suppliers.map(s => ({ id: s.id, name: s.name, country: s.country, city: s.city, website: s.website,
+      stats: { ...summaryStats(stats.find(a => a.id === s.id)), sectorsWon: facets.filter(f => f.ownerId === s.id && f.dimension === 'sector').map(f => [f.name, f.count]), topBuyers: facets.filter(f => f.ownerId === s.id && f.dimension === 'buyer').map(f => [f.name, f.count]) },
+      recentAwards: s.awards.map(a => normalizeAward(a, [], 'public')),
+    })) }
   })
-
-  const competitors = await Promise.all(
-    suppliers.map(async (s) => {
-      const allAwards = await db.award.findMany({
-        where: { supplierOrgId: s.id },
-        include: { tender: { select: { sector: true, market: true, buyer: { include: { organization: { select: { name: true } } } } } } },
-      })
-      const totalValue = allAwards.reduce((acc, a) => acc + (a.contractValue ?? 0), 0)
-      const avgValue = allAwards.length > 0 ? totalValue / allAwards.length : 0
-
-      // Top buyers
-      const buyerMap: Record<string, number> = {}
-      allAwards.forEach(a => {
-        const bname = a.tender.buyer?.organization?.name ?? 'Unknown'
-        buyerMap[bname] = (buyerMap[bname] ?? 0) + 1
-      })
-      const topBuyers = Object.entries(buyerMap).sort((a, b) => b[1] - a[1]).slice(0, 3)
-
-      // Sectors won
-      const sectorMap: Record<string, number> = {}
-      allAwards.forEach(a => { sectorMap[a.tender.sector] = (sectorMap[a.tender.sector] ?? 0) + 1 })
-
-      return {
-        id: s.id,
-        name: s.name,
-        country: s.country,
-        city: s.city,
-        website: s.website,
-        isCompetitor: s.supplierProfile?.isCompetitor ?? false,
-        isPartner: s.supplierProfile?.isPartner ?? false,
-        stats: {
-          totalAwards: allAwards.length,
-          totalAwardValueUSD: totalValue,
-          averageAwardValueUSD: avgValue,
-          sectorsWon: Object.entries(sectorMap).sort((a, b) => b[1] - a[1]),
-          topBuyers,
-        },
-        recentAwards: s.awards.slice(0, 3).map(a => ({
-          id: a.id,
-          tender: a.tender,
-          contractValue: a.contractValue,
-          awardedAt: a.awardedAt,
-        })),
-      }
-    })
-  )
-
-  return NextResponse.json({
-    items: competitors.sort((a, b) => b.stats.totalAwardValueUSD - a.stats.totalAwardValueUSD),
-  })
-}
+  const annotations = await db.tenantSupplierAnnotation.findMany({ where: { tenantId: ctx.tenantId, organizationId: { in: result.items.map(s => s.id) } } })
+  return NextResponse.json({ ...result, limit, offset, normalizationBasis: 'persisted USD or original USD', items: result.items.map(s => { const note = annotations.find(a => a.organizationId === s.id); return { ...s, isCompetitor: note?.isCompetitor ?? false, isPartner: note?.isPartner ?? false, notes: note?.notes ?? null } }) })
+})

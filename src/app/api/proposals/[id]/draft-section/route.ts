@@ -1,6 +1,15 @@
+import { reserveProviderCall, settleProviderCall } from '@/lib/usage-meter'
+import { isCurrentVerified } from '@/lib/evidence-validity'
+import { groundedDraft } from '@/lib/proposal-integrity'
+import { evaluateRequirement } from '@/lib/requirement-evaluation'
+import { loadTenantEvaluationRequirements } from '@/lib/tenant-requirement-evaluation'
+import { requireProposalEvidence } from '@/lib/evidence-security'
+import { requireEditableProposal, recomputeProposal } from '@/lib/proposal-workflow'
+import { readJson, parseIds } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
 import { z } from 'zod'
 
@@ -27,14 +36,14 @@ const DraftSectionSchema = z.object({
 
 type DraftSectionResult = z.infer<typeof DraftSectionSchema>
 
-export async function POST(
+export const POST = withApiErrors(async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { sectionId } = body as { sectionId: string }
+  const { id } = parseIds(await params)
+  const { ctx } = await requireTenantWithRole('contributor')
+  const body = await readJson(req, 'draft')
+  const { sectionId } = body
 
   // Verify proposal + section
   const proposal = await db.proposal.findFirst({
@@ -42,13 +51,13 @@ export async function POST(
     include: {
       pursuit: {
         include: {
-          tender: { select: { title: true, description: true, sector: true, market: true, requirements: { select: { criterion: true, category: true, threshold: true } } } },
+          tender: { select: { title: true, description: true, sector: true, market: true, requirements: true } },
           company: {
             include: {
-              evidence: { select: { id: true, title: true, category: true, description: true } },
-              certifications: { select: { id: true, name: true, issuer: true } },
-              projectRefs: { select: { id: true, title: true, client: true, valueUSD: true, role: true } },
-              employees: { select: { id: true, name: true, role: true, qualifications: true } },
+              evidence: true,
+              certifications: true,
+              projectRefs: true,
+              
             },
           },
         },
@@ -62,15 +71,22 @@ export async function POST(
   }
 
   const section = proposal.sections[0]
+  if (section.revision !== body.expectedRevision) throw new Response('Section changed; reload before drafting', { status: 409 })
+  if (['submitted','withdrawn'].includes(proposal.status) || ['submitted','won','lost'].includes(proposal.pursuit.stage)) throw new Response('Proposal is locked', { status: 409 })
   const tender = proposal.pursuit.tender
   const company = proposal.pursuit.company
+  if (company.tenantId !== ctx.tenantId) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+  const evaluatedRequirements = await loadTenantEvaluationRequirements(ctx.tenantId, proposal.pursuit.tenderId, tender.requirements)
+  const rates = await db.currencyRate.findMany({ where: { tenantId: ctx.tenantId, rateDate: { lte: new Date() } } })
+  const requirementGaps = evaluatedRequirements.filter(row => row.isMandatory &&
+    evaluateRequirement(row, company.evidence, rates, ctx.tenantId).status !== 'pass').map(row => `Unresolved mandatory requirement: ${row.criterion}`)
 
   // Build the evidence graph for the prompt — ONLY these may be cited
   const evidenceGraph = {
-    certifications: company.certifications.map(c => ({ id: c.id, title: c.name, issuer: c.issuer })),
-    projects: company.projectRefs.map(p => ({ id: p.id, title: p.title, client: p.client, value: p.valueUSD, role: p.role })),
-    evidence: company.evidence.map(e => ({ id: e.id, title: e.title, category: e.category, description: e.description })),
-    employees: company.employees.map(e => ({ id: e.id, name: e.name, role: e.role, qualifications: e.qualifications })),
+    certifications: company.certifications.filter(record => isCurrentVerified(record)).map(c => ({ id: c.id, title: c.name, issuer: c.issuer })),
+    projects: company.projectRefs.filter(record => isCurrentVerified(record)).map(p => ({ id: p.id, title: p.title, client: p.client, value: p.valueUSD, role: p.role })),
+    evidence: company.evidence.filter(record => isCurrentVerified(record)).map(e => ({ id: e.id, title: e.title, category: e.category, description: e.description })),
+
   }
 
   // Build the system prompt with evidence gating
@@ -80,7 +96,7 @@ Your task: draft a "${section.sectionType}" section for a proposal.
 
 CRITICAL RULES (EVIDENCE GATING):
 1. You may ONLY mention company capabilities, certifications, projects, or personnel that are listed in the EVIDENCE GRAPH below.
-2. Every factual claim about the company MUST reference an evidence ID from the graph.
+2. Every factual claim about the company MUST use an inline citation [evidence:ID] from the graph, also listed in evidenceUsed.
 3. If you cannot find evidence for a claim, DO NOT make the claim — instead, add it to the "gaps" array.
 4. Do NOT invent projects, certifications, clients, or financial figures.
 5. The draft must be professional, specific, and grounded in the provided evidence.
@@ -107,7 +123,7 @@ Tender requirements:
 ${JSON.stringify(tender.requirements.slice(0, 10), null, 2)}
 
 Company: ${company.name} (${company.country})
-${company.description ?? ''}
+
 
 EVIDENCE GRAPH (only these may be cited as company strengths):
 ${JSON.stringify(evidenceGraph, null, 2)}
@@ -118,6 +134,8 @@ Section to draft: ${section.title} (${section.sectionType})`
   const startTime = Date.now()
   let result: { success: boolean; data?: DraftSectionResult; error?: string; model?: string; inputTokens?: number; outputTokens?: number; latencyMs?: number }
 
+  const meteringInput = systemPrompt + '\n' + userPrompt
+  const reservation = await reserveProviderCall(ctx.tenantId, meteringInput, 1500)
   try {
     const zai = await ZAI.create()
     const completion = await zai.chat.completions.create({
@@ -127,11 +145,13 @@ Section to draft: ${section.title} (${section.sectionType})`
         { role: 'user', content: userPrompt },
       ],
       thinking: { type: 'disabled' },
+      max_tokens: reservation.maxOutputTokens,
       temperature: 0.3,
     })
 
     const latencyMs = Date.now() - startTime
     const content = completion?.choices?.[0]?.message?.content ?? ''
+    const tokenUsage = await settleProviderCall(reservation, completion.usage, meteringInput, content)
 
     // Extract JSON
     const jsonMatch = content.match(/\{[\s\S]*\}/)
@@ -144,8 +164,7 @@ Section to draft: ${section.title} (${section.sectionType})`
         if (!validationResult.success) {
           result = { success: false, error: 'LLM output failed schema validation', latencyMs }
         } else {
-          const inputTokens = Math.ceil(userPrompt.length / 4)
-          const outputTokens = Math.ceil(content.length / 4)
+          const { inputTokens, outputTokens } = tokenUsage
           result = {
             success: true,
             data: validationResult.data,
@@ -163,38 +182,30 @@ Section to draft: ${section.title} (${section.sectionType})`
     result = { success: false, error: 'LLM call failed: ' + (e as Error).message, latencyMs: Date.now() - startTime }
   }
 
-  // Update the section with the draft
   if (result.success && result.data) {
-    const evidenceIds = result.data.evidenceUsed.map(e => e.evidenceId)
-    await db.proposalSection.update({
-      where: { id: sectionId },
-      data: {
-        content: result.data.content,
-        wordCount: result.data.wordCount,
-        status: 'drafting',
-        evidenceIds: JSON.stringify(evidenceIds),
-        evidenceCount: evidenceIds.length,
-        hasGaps: result.data.hasGaps,
-        aiAssisted: true,
-        aiModel: result.model,
-        lastEditedAt: new Date(),
-        lastEditedBy: ctx.userId,
-      },
-    })
-
-    // Update proposal stats
-    const allSections = await db.proposalSection.findMany({
-      where: { proposalId: id },
-      select: { wordCount: true, evidenceCount: true, hasGaps: true },
-    })
-    await db.proposal.update({
-      where: { id },
-      data: {
-        wordCount: allSections.reduce((acc, s) => acc + s.wordCount, 0),
-        evidenceCoverage: allSections.filter(s => s.evidenceCount > 0).length / allSections.length,
-        lastEditedAt: new Date(),
-        lastEditedBy: ctx.userId,
-      },
+    const allowedIds = new Set([...evidenceGraph.evidence, ...evidenceGraph.certifications, ...evidenceGraph.projects].map(record => record.id))
+    try {
+      const grounded = groundedDraft(result.data.content, result.data.evidenceUsed.map(record => record.evidenceId), allowedIds)
+      const gaps = [...requirementGaps, ...(grounded.hasGaps ? ['Missing evidence or unresolved gap markers in the draft.'] : []), ...result.data.gaps.map(gap => `AI review warning: ${gap}`), ...(result.data.hasGaps && !result.data.gaps.length ? ['AI flagged unresolved evidence gaps; human review required.'] : [])]
+      const content = result.data.content + (gaps.length ? '\n\n' + gaps.map(gap => `[gap: ${gap.replaceAll(']', ')')}]`).join('\n') : '')
+      result.data = { ...result.data, content, wordCount: content.trim().split(/\s+/).filter(Boolean).length, hasGaps: grounded.hasGaps || gaps.length > 0 || result.data.hasGaps, gaps,
+        evidenceUsed: grounded.evidenceIds.map(evidenceId => ({ evidenceId, title: [...evidenceGraph.evidence, ...evidenceGraph.certifications, ...evidenceGraph.projects].find(row => row.id === evidenceId)!.title, snippet: 'Referenced inline; human verification required' })) }
+    } catch (error) {
+      result = { success: false, error: (error as Error).message, latencyMs: result.latencyMs }
+    }
+  }
+  if (result.success && result.data) {
+    const data = result.data
+    await db.$transaction(async tx => {
+      const current = await requireEditableProposal(tx, ctx.tenantId, id)
+      if (current.revision !== proposal.revision) throw new Response('Proposal changed while drafting; generated text was not saved', { status: 409 })
+      const evidenceIds = await requireProposalEvidence(data.evidenceUsed.map(record => record.evidenceId), ctx.tenantId, current.pursuit.companyId, tx)
+      const claim = await tx.proposalSection.updateMany({ where: { id: sectionId, proposalId: id, revision: body.expectedRevision }, data: {
+        content: data.content, wordCount: data.wordCount, status: 'in_review', evidenceIds: JSON.stringify(evidenceIds), evidenceCount: evidenceIds.length,
+        hasGaps: data.hasGaps, aiAssisted: true, aiModel: result.model, revision: { increment: 1 }, lastEditedAt: new Date(), lastEditedBy: ctx.userId,
+      } })
+      if (claim.count !== 1) throw new Response('Section changed while drafting; generated text was not saved', { status: 409 })
+      await recomputeProposal(tx, id, ctx)
     })
   }
 
@@ -233,7 +244,7 @@ Section to draft: ${section.title} (${section.sectionType})`
     outputTokens: result.outputTokens,
     latencyMs: result.latencyMs,
     note: result.success
-      ? 'AI-assisted draft generated. Every factual claim links to evidence. Review and edit before submission.'
+      ? 'Draft citations validated. A manager must verify every claim and approve this section before submission.'
       : 'Draft generation failed. Please draft manually.',
   })
-}
+})

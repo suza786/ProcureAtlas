@@ -1,19 +1,21 @@
+import { parseIds } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 import { extractRequirements } from '@/lib/llm'
 import { logAction } from '@/lib/auth'
 
 // POST /api/tenders/[id]/extract-requirements
 // Triggers LLM extraction of requirements from the tender description.
 // Output is saved as an LlmExtraction record with reviewStatus=pending.
-// Nothing is written to the Requirement table until a human approves.
-export async function POST(
+// Human approval stores tenant-private reviewed annotations; canonical Requirement rows are unchanged.
+export const POST = withApiErrors(async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
-  const ctx = await getCurrentTenant()
+  const { id } = parseIds(await params)
+  const { ctx } = await requireTenantWithRole('contributor')
 
   const tender = await db.tender.findUnique({
     where: { id },
@@ -98,4 +100,4 @@ export async function POST(
       ? 'Extraction complete. Items are pending human review — nothing has been written to the Requirement table.'
       : 'Extraction failed. Manual review required.',
   })
-}
+})

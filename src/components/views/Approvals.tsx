@@ -1,4 +1,9 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
+import { WorkflowDialog } from '@/components/ui/workflow-dialog'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -41,6 +46,8 @@ const TRIGGER_LABELS: Record<string, string> = {
 }
 
 export function Approvals() {
+  const { t, formatDateTime, formatDate } = useTranslation()
+
   const [items, setItems] = useState<ApprovalItem[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending')
@@ -48,7 +55,7 @@ export function Approvals() {
   const [showChains, setShowChains] = useState(false)
 
   const load = () => {
-    fetch(`/api/approvals?status=${filter === 'all' ? '' : filter}`)
+    apiFetch(`/api/approvals?status=${filter === 'all' ? '' : filter}`)
       .then(r => r.json())
       .then(d => { setItems(d.items ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -59,13 +66,14 @@ export function Approvals() {
   const decide = async (id: string, decision: string) => {
     const reason = decision === 'approved' ? '' : prompt(`Reason for ${decision}:`) ?? ''
     setActioning(id)
-    await fetch(`/api/approvals/${id}`, {
+    try { await apiFetch(`/api/approvals/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision, reason }),
     })
-    setActioning(null)
     load()
+    } catch { /* Shared API notice displays the failure. */ }
+    finally { setActioning(null) }
   }
 
   return (
@@ -74,8 +82,7 @@ export function Approvals() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Shield className="h-6 w-6 text-slate-700" />
-            Approvals
-          </h1>
+            {t("Approvals")}</h1>
           <p className="text-sm text-slate-500 mt-1">
             No consequential action is taken without explicit human authorization. SLA-tracked with escalation.
           </p>
@@ -84,8 +91,7 @@ export function Approvals() {
           onClick={() => setShowChains(true)}
           className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
-          <Settings className="h-3.5 w-3.5" /> Approval Chains
-        </button>
+          <Settings className="h-3.5 w-3.5" /> {t("Approval Chains")}</button>
       </div>
 
       <div className="flex gap-2">
@@ -105,7 +111,7 @@ export function Approvals() {
 
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading approvals...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading approvals...")}</div>
         ) : items.length === 0 ? (
           <div className="p-8 text-center text-sm text-slate-500">No {filter} approvals.</div>
         ) : (
@@ -132,12 +138,12 @@ export function Approvals() {
                           <AlertTriangle className="h-2.5 w-2.5" /> overdue
                         </span>
                       )}
-                      <span className="text-[10px] text-slate-400">Step {a.stepOrder}</span>
+                      <span className="text-[10px] text-slate-400">{t("Step")}{' '}{a.stepOrder}</span>
                     </div>
                     <p className="text-sm font-medium text-slate-900 mt-1 truncate">{a.pursuit.tender.title}</p>
                     {a.reason && <p className="text-xs text-slate-500 mt-0.5">{a.reason}</p>}
                     <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500">
-                      <span>Requested by {a.requestedBy}</span>
+                      <span>{t("Requested by")}{' '}{a.requestedBy}</span>
                       {a.approverRole && <span>· Requires: {a.approverRole}</span>}
                       {a.approver && <span>· Decided by {a.approver.email}</span>}
                       <span>· {formatDateTime(a.createdAt)}</span>
@@ -157,22 +163,19 @@ export function Approvals() {
                         className="flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
                       >
                         {actioning === a.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                        Approve
-                      </button>
+                        {t("Approve")}</button>
                       <button
                         onClick={() => decide(a.id, 'rejected')}
                         disabled={actioning === a.id}
                         className="flex items-center gap-1 rounded-md border border-rose-500/30 text-rose-700 px-2 py-1 text-[10px] font-medium hover:bg-rose-50 disabled:opacity-50"
                       >
-                        <XCircle className="h-2.5 w-2.5" /> Reject
-                      </button>
+                        <XCircle className="h-2.5 w-2.5" /> {t("Reject")}</button>
                       <button
                         onClick={() => decide(a.id, 'changes_requested')}
                         disabled={actioning === a.id}
                         className="text-[10px] text-slate-500 hover:text-slate-900 px-1.5 py-1"
                       >
-                        Changes
-                      </button>
+                        {t("Changes")}</button>
                     </div>
                   )}
                 </div>
@@ -188,23 +191,24 @@ export function Approvals() {
 }
 
 function ApprovalChainsModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
+
   const [chains, setChains] = useState<Array<{ id: string; name: string; triggerType: string; slaHours: number; isActive: boolean; stepCount: number; steps?: Array<{ order: number; role: string; approverEmail?: string }> }>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/approval-chains')
+    apiFetch('/api/approval-chains')
       .then(r => r.json())
       .then(d => { setChains(d.items ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   return (
-    <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-2xl rounded-lg bg-white p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">Approval Chain Configuration</h2>
+    <WorkflowDialog title={t("Approval Chain Configuration")} description="Review the configured approval steps and response deadlines." onClose={onClose} wide>
         {loading ? (
-          <p className="text-sm text-slate-500">Loading...</p>
+          <p className="text-sm text-slate-500">{t("Loading...")}</p>
         ) : chains.length === 0 ? (
-          <p className="text-sm text-slate-500">No approval chains configured. Default chains are used for bid decision and submission.</p>
+          <p className="text-sm text-slate-500">{t("No approval chains configured. Default chains are used for bid decision and submission.")}</p>
         ) : (
           <div className="space-y-3">
             {chains.map(c => (
@@ -231,8 +235,7 @@ function ApprovalChainsModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         )}
-        <button onClick={onClose} className="mt-4 text-xs text-slate-500 hover:text-slate-900">Close</button>
-      </div>
-    </div>
+        <button onClick={onClose} className="mt-4 text-xs text-slate-500 hover:text-slate-900">{t("Close")}</button>
+    </WorkflowDialog>
   )
 }

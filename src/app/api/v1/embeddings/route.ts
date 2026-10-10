@@ -1,14 +1,21 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { readJson, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 import { logAction } from '@/lib/auth'
 import crypto from 'crypto'
+import { requireEmbeddingEntity } from '@/lib/embedding-security'
 
 // POST /api/v1/embeddings — generate embeddings for semantic search
 // Phase 5: deterministic hash-based embeddings (pgvector-ready).
 // In production with PostgreSQL + pgvector, this will use a real embedding model.
-export async function POST(req: NextRequest) {
+export const POST = withApiErrors(async function POST(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:write')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -20,12 +27,8 @@ export async function POST(req: NextRequest) {
     return res
   }
 
-  const body = await req.json()
-  const { texts, entityType, entityId } = body as {
-    texts: string[]
-    entityType?: string
-    entityId?: string
-  }
+  const body = await readJson(req, 'embeddings')
+  const { texts, entityType, entityId } = body
 
   if (!texts || !Array.isArray(texts) || texts.length === 0) {
     return NextResponse.json({ error: 'texts[] required' }, { status: 400 })
@@ -34,6 +37,13 @@ export async function POST(req: NextRequest) {
   if (texts.length > 20) {
     return NextResponse.json({ error: 'Maximum 20 texts per request' }, { status: 400 })
   }
+  if (texts.some(text => typeof text !== 'string' || text.length > 100_000)) {
+    return NextResponse.json({ error: 'texts must contain strings of at most 100000 characters' }, { status: 400 })
+  }
+  if ((entityType !== undefined) !== (entityId !== undefined)) {
+    return NextResponse.json({ error: 'entityType and entityId must be supplied together' }, { status: 400 })
+  }
+  if (entityType !== undefined) await requireEmbeddingEntity(entityType, entityId, authResult.tenantId)
 
   // Generate deterministic embeddings (hash-based, 256 dimensions)
   // In production: replace with real embedding model (e.g., text-embedding-3-small)
@@ -44,7 +54,7 @@ export async function POST(req: NextRequest) {
     const textHash = crypto.createHash('sha256').update(texts.join('')).digest('hex').slice(0, 16)
     await db.embedding.upsert({
       where: {
-        entityType_entityId: { entityType, entityId },
+        tenantId_entityType_entityId: { tenantId: authResult.tenantId, entityType, entityId },
       },
       update: {
         embeddingJson: JSON.stringify(embeddings[0]),
@@ -60,16 +70,16 @@ export async function POST(req: NextRequest) {
         model: 'deterministic-v1',
         dimensions: 256,
       },
-    }).catch(() => { /* ignore */ })
+    })
   }
 
   // Log usage
   await logAction({
     tenantId: authResult.tenantId ?? 'unknown',
-    userId: authResult.apiKeyId,
+    apiKeyId: authResult.apiKeyId,
     action: 'api_v1_embeddings',
     entityType: 'embedding',
-    afterJson: { textCount: texts.length, dimensions: 256 },
+    afterJson: { apiKeyId: authResult.apiKeyId, textCount: texts.length, dimensions: 256 },
     request: req,
   })
 
@@ -86,11 +96,12 @@ export async function POST(req: NextRequest) {
   })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})
 
 // GET /api/v1/embeddings — semantic search using cached embeddings
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -102,10 +113,10 @@ export async function GET(req: NextRequest) {
     return res
   }
 
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const query = searchParams.get('q')
   const entityType = searchParams.get('entityType')
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '10', 10), 50)
+  const { limit } = pagination(searchParams, 10, 50)
 
   if (!query) {
     return NextResponse.json({ error: 'q parameter required for semantic search' }, { status: 400 })
@@ -115,7 +126,7 @@ export async function GET(req: NextRequest) {
   const queryEmbedding = generateDeterministicEmbedding(query)
 
   // Fetch cached embeddings (optionally filtered by entity type)
-  const where: Record<string, unknown> = {}
+  const where: Prisma.EmbeddingWhereInput = { tenantId: authResult.tenantId }
   if (entityType) where.entityType = entityType
 
   const cached = await db.embedding.findMany({
@@ -143,7 +154,7 @@ export async function GET(req: NextRequest) {
   })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})
 
 // ============================================================
 // Deterministic embedding generation (dev fallback for pgvector)

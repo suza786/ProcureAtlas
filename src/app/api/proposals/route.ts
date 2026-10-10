@@ -1,16 +1,22 @@
+import { createSubmissionApprovals } from '@/lib/approval-workflow'
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
 
 // GET /api/proposals — list proposals for the current tenant
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
   const pursuitId = searchParams.get('pursuitId')
   const status = searchParams.get('status')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.ProposalWhereInput = { tenantId: ctx.tenantId }
   if (pursuitId) where.pursuitId = pursuitId
   if (status) where.status = status
 
@@ -48,13 +54,13 @@ export async function GET(req: NextRequest) {
       approvalCount: p._count.approvals,
     })),
   })
-}
+})
 
 // POST /api/proposals — create a new proposal
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { pursuitId, title } = body as { pursuitId: string; title: string }
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('contributor')
+  const body = await readJson(req, 'proposalCreate')
+  const { pursuitId, title } = body
 
   if (!pursuitId || !title) {
     return NextResponse.json({ error: 'pursuitId and title required' }, { status: 400 })
@@ -81,11 +87,15 @@ export async function POST(req: NextRequest) {
     { sectionType: 'timeline', title: 'Timeline & Milestones', order: 9 },
   ]
 
-  const proposal = await db.proposal.create({
+  const proposal = await db.$transaction(async tx => {
+  const currentPursuit = await tx.pursuit.findFirst({ where: { id: pursuitId, tenantId: ctx.tenantId } })
+  if (!currentPursuit || ['submitted','won','lost','no_bid'].includes(currentPursuit.stage)) throw new Response('Pursuit unavailable for proposals', { status: 409 })
+  const proposal = await tx.proposal.create({
     data: {
       tenantId: ctx.tenantId,
       pursuitId,
       title,
+      currentVersion: 0,
       totalSections: defaultSections.length,
       lastEditedAt: new Date(),
       lastEditedBy: ctx.userId,
@@ -94,6 +104,10 @@ export async function POST(req: NextRequest) {
       },
     },
     include: { sections: true },
+  })
+
+    await createSubmissionApprovals(tx, ctx.tenantId, pursuitId, proposal.id, ctx.userId)
+    return proposal
   })
 
   await logAction({
@@ -107,4 +121,4 @@ export async function POST(req: NextRequest) {
   })
 
   return NextResponse.json(proposal, { status: 201 })
-}
+})

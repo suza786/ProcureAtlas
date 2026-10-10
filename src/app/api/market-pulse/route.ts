@@ -1,8 +1,11 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { getCurrentTenant } from '@/lib/tenant'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/market-pulse — aggregated market intelligence for the dashboard
-export async function GET() {
+export const GET = withApiErrors(async function GET() {
+  const ctx = await getCurrentTenant()
   const tenders = await db.tender.findMany({
     select: {
       id: true,
@@ -57,4 +60,4 @@ export async function GET() {
     upcomingDeadlines: deadlines.sort((a, b) => a.days - b.days),
     totalPipelineValueUSD: tenders.reduce((acc, t) => acc + (t.valueUSD ?? 0), 0),
   })
-}
+})

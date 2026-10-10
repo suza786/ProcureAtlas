@@ -1,237 +1,102 @@
-'use client'
+﻿'use client'
 
 import { useEffect, useState } from 'react'
-import { formatUSD } from '@/lib/format'
-import { cn } from '@/lib/utils'
-import { BarChart3, TrendingUp, Clock, Cpu, Shield, Award } from 'lucide-react'
-import {
-  ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip,
-  CartesianGrid, Legend, AreaChart, Area,
-} from 'recharts'
+import { apiFetch } from '@/lib/api-client'
+import { useTranslation } from '@/hooks/use-translation'
+import { DeferredLineChart } from '@/components/charts/deferred-charts'
 
+interface Snapshot {
+  date: string
+  observedAt: string | null
+  activePursuits: number
+  biddingPursuits: number
+  wonPursuits: number
+  lostPursuits: number
+  pipelineValueUSD: number
+  winRate: number
+  llmCallsCount: number
+  llmInputTokens: number
+  llmOutputTokens: number
+  llmCostUsd: number | null
+}
 interface AnalyticsData {
-  current: {
-    activePursuits: number
-    biddingPursuits: number
-    submittedPursuits: number
-    wonPursuits: number
-    lostPursuits: number
-    pipelineValueUSD: number
-    wonValueUSD: number
-    winRate: number
-    activeAlerts: number
-    llmCalls30d: number
-    llmCost30d: number
-  }
+  current: { activePursuits: number; pipelineValueUSD: number; wonValueUSD: number; winRate: number; llmCalls30d: number; llmCost30d: number | null; pendingProviderCalls: number }
+  metadata: { timezone: string; historyDays: number; providerUsageWindowDays: number; observedAt: string }
+  history: Snapshot[]
   trends: {
-    winRate: Array<{ month: string; winRate: number; won: number; lost: number }>
-    pipelineValue: Array<{ month: string; value: number; won: number }>
-    llmUsage: Array<{ month: string; calls: number; cost: number }>
-    evidenceCoverage: Array<{ month: string; coverage: number; count: number }>
-    bidCycleTime: Array<{ month: string; days: number; wordCount: number }>
+    winRate: Array<{ date: string; winRate: number }>
+    pipelineValue: Array<{ date: string; value: number; won: number }>
+    llmUsage: Array<{ date: string; calls: number; cost: number | null }>
+    evidenceCoverage: Array<{ date: string; coverage: number }>
+    bidCycleTime: Array<{ date: string; days: number; wordCount: number }>
   }
-  snapshots: number
 }
 
 export function Analytics() {
+  const { t, locale } = useTranslation()
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
-
+  const [error, setError] = useState(false)
   useEffect(() => {
-    fetch('/api/analytics')
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+    let cancelled = false
+    apiFetch('/api/analytics').then(async response => {
+      if (!response.ok) throw new Error('Analytics request failed')
+      const result = await response.json()
+      if (!cancelled) setData(result)
+    }).catch(() => { if (!cancelled) setError(true) }).finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [])
-
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading analytics...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Failed to load.</div>
-
-  return (
-    <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-          <BarChart3 className="h-6 w-6 text-slate-700" />
-          Advanced Analytics
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Tenant-level analytics dashboard with win-rate trends, pipeline velocity, and LLM usage over 6 months.
-        </p>
+  const dateLabel = (date: string) => new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(new Date(`${date}T00:00:00Z`))
+  const number = (value: number) => new Intl.NumberFormat(locale).format(value)
+  const formatUSD = (value: number) => new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', maximumFractionDigits: 4 }).format(value)
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t('common.loading')}</div>
+  if (error || !data) return <div role="alert" className="p-6 text-sm text-rose-600">{t('analytics.loadFailed')}</div>
+  const chart = (title: string, rows: Array<{ date: string }>, series: Array<{ key: string; label: string; color: string }>, percent = false) => (
+    <section className="rounded-lg border border-slate-200 bg-white p-4">
+      <h2 className="text-sm font-semibold text-slate-900 mb-3">{title}</h2>
+      <div className="h-56">
+        <DeferredLineChart label={title} rows={rows} series={series} percent={percent} dateLabel={dateLabel} number={number} />
       </div>
-
-      {/* Current metrics tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        <MetricTile icon={TrendingUp} label="Active Pursuits" value={data.current.activePursuits.toString()} tone="sky" />
-        <MetricTile icon={Award} label="Win Rate" value={`${data.current.winRate}%`} tone="emerald" />
-        <MetricTile icon={TrendingUp} label="Pipeline Value" value={formatUSD(data.current.pipelineValueUSD)} tone="violet" />
-        <MetricTile icon={Award} label="Won Value" value={formatUSD(data.current.wonValueUSD)} tone="emerald" />
-        <MetricTile icon={Cpu} label="LLM Calls (30d)" value={data.current.llmCalls30d.toString()} tone="violet" />
-        <MetricTile icon={Cpu} label="LLM Cost (30d)" value={`$${data.current.llmCost30d.toFixed(4)}`} tone="amber" />
-      </div>
-
-      {/* Win Rate Trend */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-          <Award className="h-4 w-4 text-emerald-600" />
-          Win Rate Trend (6 months)
-        </h2>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.trends.winRate}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#64748b" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#64748b" domain={[0, 100]} />
-              <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Line type="monotone" dataKey="winRate" stroke="#10b981" strokeWidth={2} name="Win Rate %" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Pipeline Value Trend */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4 text-violet-600" />
-          Pipeline Value Trend (USD K)
-        </h2>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data.trends.pipelineValue}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#64748b" />
-              <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-              <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Area type="monotone" dataKey="value" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.1} name="Pipeline Value" />
-              <Area type="monotone" dataKey="won" stroke="#10b981" fill="#10b981" fillOpacity={0.1} name="Won Value" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* LLM Usage + Evidence Coverage */}
+    </section>
+  )
+  return <div className="space-y-4">
+    <div>
+      <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t('analytics.title')}</h1>
+      <p className="text-sm text-slate-500 mt-1">{t('analytics.observedDescription')}</p>
+      <p className="text-xs text-slate-500 mt-1">{t('analytics.dailyUtc')} · {t('analytics.latestWindow')} {number(data.metadata.historyDays)} {t('common.days')} · {t('analytics.providerWindow')} {number(data.metadata.providerUsageWindowDays)} {t('common.days')}</p>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {[
+        [t('cc.activePursuits'), number(data.current.activePursuits)],
+        [t('cc.winRate'), `${number(data.current.winRate)}%`],
+        [t('cc.pipelineValue'), formatUSD(data.current.pipelineValueUSD)],
+        [t('analytics.wonValue'), formatUSD(data.current.wonValueUSD)],
+        [t('analytics.calls30d'), number(data.current.llmCalls30d)],
+        [t('analytics.cost30d'), data.current.llmCost30d === null ? t('analytics.unknown') : formatUSD(data.current.llmCost30d)],
+      ].map(([label, value]) => <div key={label} className="rounded-lg border border-slate-200 bg-white p-3"><p className="text-xs text-slate-500">{label}</p><p className="text-xl font-semibold text-slate-900 mt-1">{value}</p></div>)}
+    </div>
+    {data.current.pendingProviderCalls > 0 && <p className="text-sm text-amber-700">{t('analytics.pendingProviderCalls')}: {number(data.current.pendingProviderCalls)}</p>}
+    {!data.history.length ? <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm text-slate-600">{t('analytics.emptyHistory')}</div> : <>
+      {chart(t('analytics.winRateTrend'), data.trends.winRate, [{ key: 'winRate', label: t('cc.winRate'), color: '#10b981' }], true)}
+      {chart(t('analytics.pipelineValue'), data.trends.pipelineValue, [{ key: 'value', label: t('analytics.pipelineUsdK'), color: '#8b5cf6' }, { key: 'won', label: t('analytics.wonUsdK'), color: '#10b981' }])}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Cpu className="h-4 w-4 text-violet-600" />
-            LLM Usage Trend
-          </h2>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.trends.llmUsage}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#64748b" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#64748b" />
-                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                <Bar dataKey="calls" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="API Calls" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <Shield className="h-4 w-4 text-emerald-600" />
-            Evidence Coverage Trend
-          </h2>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data.trends.evidenceCoverage}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#64748b" />
-                <YAxis tick={{ fontSize: 11 }} stroke="#64748b" domain={[0, 100]} />
-                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                <Line type="monotone" dataKey="coverage" stroke="#10b981" strokeWidth={2} name="Coverage %" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
+        {chart(t('analytics.llmUsage'), data.trends.llmUsage, [{ key: 'calls', label: t('analytics.providerCalls'), color: '#8b5cf6' }])}
+        {chart(t('analytics.evidenceCoverage'), data.trends.evidenceCoverage, [{ key: 'coverage', label: t('analytics.verifiedCoverage'), color: '#10b981' }], true)}
       </div>
-
-      {/* Bid Cycle Time */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
-          <Clock className="h-4 w-4 text-sky-600" />
-          Avg Bid Cycle Time & Proposal Word Count
-        </h2>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.trends.bidCycleTime}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} stroke="#64748b" />
-              <YAxis yAxisId="left" tick={{ fontSize: 11 }} stroke="#64748b" />
-              <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} stroke="#64748b" />
-              <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-              <Legend wrapperStyle={{ fontSize: '11px' }} />
-              <Line yAxisId="left" type="monotone" dataKey="days" stroke="#0ea5e9" strokeWidth={2} name="Cycle Days" />
-              <Line yAxisId="right" type="monotone" dataKey="wordCount" stroke="#f59e0b" strokeWidth={2} name="Word Count" />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Monthly snapshot table */}
-      <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Monthly Snapshots ({data.snapshots})</h2>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Month</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Active</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Bidding</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Won</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Lost</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Pipeline</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Win Rate</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">LLM Cost</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.trends.winRate.map((snap, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{snap.month}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 text-right">{data.trends.pipelineValue[i]?.value ?? '—'}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 text-right">{data.trends.bidCycleTime[i]?.days ?? '—'}d</td>
-                  <td className="px-3 py-2.5 text-xs text-emerald-700 font-medium text-right">{snap.won}</td>
-                  <td className="px-3 py-2.5 text-xs text-rose-700 text-right">{snap.lost}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-700 text-right">{formatUSD((data.trends.pipelineValue[i]?.value ?? 0) * 1000)}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-700 text-right">{snap.winRate}%</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600 text-right">${data.trends.llmUsage[i]?.cost.toFixed(4) ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function MetricTile({ icon: Icon, label, value, tone }: {
-  icon: React.ElementType
-  label: string
-  value: string
-  tone: 'emerald' | 'sky' | 'violet' | 'amber'
-}) {
-  const toneMap: Record<string, string> = {
-    emerald: 'text-emerald-600 bg-emerald-500/10',
-    sky: 'text-sky-600 bg-sky-500/10',
-    violet: 'text-violet-600 bg-violet-500/10',
-    amber: 'text-amber-600 bg-amber-500/10',
-  }
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</span>
-        <div className={cn('rounded-md p-1', toneMap[tone])}>
-          <Icon className="h-3 w-3" />
-        </div>
-      </div>
-      <p className="text-xl font-semibold text-slate-900">{value}</p>
-    </div>
-  )
+      {chart(t('analytics.bidCycleTime'), data.trends.bidCycleTime, [{ key: 'days', label: t('analytics.cycleDays'), color: '#0ea5e9' }])}
+      {chart(t('analytics.proposalWords'), data.trends.bidCycleTime, [{ key: 'wordCount', label: t('analytics.wordCount'), color: '#f59e0b' }])}
+      <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <h2 className="text-sm font-semibold text-slate-900 px-4 py-3">{t('analytics.dailySnapshots')} ({number(data.history.length)})</h2>
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead><tr className="border-y border-slate-200 bg-slate-50 text-left">{['analytics.dateUtc', 'analytics.observedAtUtc', 'analytics.active', 'analytics.bidding', 'analytics.won', 'analytics.lost', 'cc.pipelineValue', 'cc.winRate', 'analytics.providerCalls', 'analytics.tokens', 'analytics.cost'].map(key => <th key={key} className="px-3 py-2 text-xs font-semibold text-slate-500">{t(key)}</th>)}</tr></thead>
+          <tbody className="divide-y divide-slate-100">{data.history.map(s => <tr key={s.date}>
+            <td className="px-3 py-2 whitespace-nowrap">{dateLabel(s.date)}</td>
+            <td className="px-3 py-2 whitespace-nowrap">{s.observedAt ? new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(s.observedAt)) : t('analytics.unknown')}</td>
+            <td className="px-3 py-2">{number(s.activePursuits)}</td><td className="px-3 py-2">{number(s.biddingPursuits)}</td><td className="px-3 py-2">{number(s.wonPursuits)}</td><td className="px-3 py-2">{number(s.lostPursuits)}</td>
+            <td className="px-3 py-2">{formatUSD(s.pipelineValueUSD)}</td><td className="px-3 py-2">{number(s.winRate)}%</td><td className="px-3 py-2">{number(s.llmCallsCount)}</td><td className="px-3 py-2">{number(s.llmInputTokens + s.llmOutputTokens)}</td><td className="px-3 py-2">{s.llmCostUsd === null ? t('analytics.unknown') : formatUSD(s.llmCostUsd)}</td>
+          </tr>)}</tbody>
+        </table></div>
+      </section>
+    </>}
+  </div>
 }

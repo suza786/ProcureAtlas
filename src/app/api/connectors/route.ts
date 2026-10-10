@@ -1,12 +1,14 @@
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 import { cptuBdConnector, runConnector } from '@/lib/connectors/cptu_bd'
 import { logAction } from '@/lib/auth'
 
 // GET /api/connectors — list connector status + recent runs
-export async function GET() {
-  const ctx = await getCurrentTenant()
+export const GET = withApiErrors(async function GET() {
+  const { ctx } = await requireTenantWithRole('admin')
 
   const connectors = [
     {
@@ -103,17 +105,13 @@ export async function GET() {
       recentRuns: runsBySource[c.code] ?? [],
     })),
   })
-}
+})
 
 // POST /api/connectors — trigger a connector run manually
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { sourceCode, runType, limit } = body as {
-    sourceCode: string
-    runType?: 'scheduled' | 'manual' | 'backfill'
-    limit?: number
-  }
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const body = await readJson(req, 'connector')
+  const { sourceCode, runType, limit } = body
 
   if (!sourceCode) {
     return NextResponse.json({ error: 'sourceCode required' }, { status: 400 })
@@ -148,6 +146,6 @@ export async function POST(req: NextRequest) {
     ...result,
     note: cptuBdConnector.isLiveEnabled
       ? 'Live fetch completed.'
-      : 'Connector live fetching is DISABLED. Returned mock data only. Enable live fetching only after legal sign-off per DATA_SOURCE_LEGAL_REGISTER.md.',
+      : 'Preview only. Sample records were not saved to the catalog.',
   })
-}
+})

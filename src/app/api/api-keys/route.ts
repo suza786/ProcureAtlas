@@ -1,16 +1,21 @@
+import { pagination, validatedSearch } from '@/lib/api-validation'
+import { readJson } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
 import crypto from 'crypto'
-import bcrypt from 'bcryptjs'
+import { digestApiKey } from '@/lib/api-key-security'
 
 // GET /api/api-keys — list API keys for the tenant
-export async function GET() {
-  const ctx = await getCurrentTenant()
+export const GET = withApiErrors(async function GET(req: Request) {
+  const { limit, offset } = pagination(validatedSearch(req))
+  const { ctx } = await requireTenantWithRole('admin')
   const keys = await db.apiKey.findMany({
     where: { tenantId: ctx.tenantId, revokedAt: null },
     orderBy: { createdAt: 'desc' },
+    take: limit, skip: offset,
   })
   return NextResponse.json({
     items: keys.map((k) => ({
@@ -23,18 +28,14 @@ export async function GET() {
       createdAt: k.createdAt,
     })),
   })
-}
+})
 
 // POST /api/api-keys — create a new API key
 // Returns the full key ONCE — only the hash is stored.
-export async function POST(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { name, scopes, expiresAt } = body as {
-    name: string
-    scopes: string[]
-    expiresAt?: string
-  }
+export const POST = withApiErrors(async function POST(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const body = await readJson(req, 'apiKey')
+  const { name, scopes, expiresAt } = body
 
   if (!name || !scopes || !Array.isArray(scopes) || scopes.length === 0) {
     return NextResponse.json({ error: 'name and scopes[] required' }, { status: 400 })
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
   // Generate key: pak_<random>
   const rawKey = 'pak_' + crypto.randomBytes(24).toString('hex')
   const keyPrefix = rawKey.slice(0, 12)
-  const keyHash = bcrypt.hashSync(rawKey, 10)
+  const keyHash = digestApiKey(rawKey)
 
   const apiKey = await db.apiKey.create({
     data: {
@@ -83,12 +84,12 @@ export async function POST(req: NextRequest) {
     createdAt: apiKey.createdAt,
     warning: 'Store this key securely. It will not be shown again.',
   }, { status: 201 })
-}
+})
 
 // DELETE /api/api-keys — revoke an API key
-export async function DELETE(req: NextRequest) {
-  const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+export const DELETE = withApiErrors(async function DELETE(req: NextRequest) {
+  const { ctx } = await requireTenantWithRole('admin')
+  const searchParams = validatedSearch(req)
   const id = searchParams.get('id')
 
   if (!id) {
@@ -110,4 +111,4 @@ export async function DELETE(req: NextRequest) {
   })
 
   return NextResponse.json({ success: true })
-}
+})

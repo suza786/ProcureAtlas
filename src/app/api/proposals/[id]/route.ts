@@ -1,14 +1,18 @@
+import { transitionProposal } from '@/lib/proposal-workflow'
+import { readJson, parseIds } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 import { logAction } from '@/lib/auth'
 
 // GET /api/proposals/[id] — full proposal with sections + versions
-export async function GET(
+export const GET = withApiErrors(async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
+  const { id } = parseIds(await params)
   const ctx = await getCurrentTenant()
 
   const proposal = await db.proposal.findFirst({
@@ -31,39 +35,19 @@ export async function GET(
   }
 
   return NextResponse.json(proposal)
-}
+})
 
 // PATCH /api/proposals/[id] — update proposal status
-export async function PATCH(
+export const PATCH = withApiErrors(async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
-  const ctx = await getCurrentTenant()
-  const body = await req.json()
-  const { status, title } = body as { status?: string; title?: string }
+  const { id } = parseIds(await params)
+  const { ctx } = await requireTenantWithRole('contributor')
+  const body = await readJson(req, 'proposalUpdate')
+  const { status, title } = body
 
-  const proposal = await db.proposal.findFirst({
-    where: { id, tenantId: ctx.tenantId },
-  })
-  if (!proposal) {
-    return NextResponse.json({ error: 'Proposal not found' }, { status: 404 })
-  }
-
-  const updates: Record<string, unknown> = {}
-  if (status) updates.status = status
-  if (title) updates.title = title
-  updates.lastEditedAt = new Date()
-  updates.lastEditedBy = ctx.userId
-
-  if (status === 'submitted') {
-    updates.submittedAt = new Date()
-  }
-
-  const updated = await db.proposal.update({
-    where: { id },
-    data: updates,
-  })
+  const updated = await transitionProposal(ctx, id, body)
 
   await logAction({
     tenantId: ctx.tenantId,
@@ -76,15 +60,15 @@ export async function PATCH(
   })
 
   return NextResponse.json(updated)
-}
+})
 
 // DELETE /api/proposals/[id]
-export async function DELETE(
+export const DELETE = withApiErrors(async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await params
-  const ctx = await getCurrentTenant()
+  const { id } = parseIds(await params)
+  const { ctx } = await requireTenantWithRole('contributor')
 
   const proposal = await db.proposal.findFirst({
     where: { id, tenantId: ctx.tenantId },
@@ -93,7 +77,12 @@ export async function DELETE(
     return NextResponse.json({ error: 'Proposal not found' }, { status: 404 })
   }
 
-  await db.proposal.delete({ where: { id } })
+  if (['submitted','approved'].includes(proposal.status)) throw new Response('Approved or submitted proposals must be retained', { status: 409 })
+  await db.$transaction(async tx => {
+    const current = await tx.proposal.findFirst({ where: { id, tenantId: ctx.tenantId } })
+    if (!current || ['submitted','approved'].includes(current.status)) throw new Response('Proposal changed; reload before deleting', { status: 409 })
+    await tx.proposal.delete({ where: { id } })
+  })
 
   await logAction({
     tenantId: ctx.tenantId,
@@ -105,4 +94,4 @@ export async function DELETE(
   })
 
   return NextResponse.json({ success: true })
-}
+})

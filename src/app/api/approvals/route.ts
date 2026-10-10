@@ -1,16 +1,20 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/approvals — list approvals for the tenant
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
+  const { limit, offset } = pagination(searchParams)
   const status = searchParams.get('status')
   const triggerType = searchParams.get('triggerType')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
-  if (status) where.decision = status
+  const where: Prisma.ApprovalWhereInput = { tenantId: ctx.tenantId }
+  if (status && status !== 'all') where.decision = status
   if (triggerType) where.triggerType = triggerType
 
   const approvals = await db.approval.findMany({
@@ -23,7 +27,7 @@ export async function GET(req: NextRequest) {
       proposal: { select: { id: true, title: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 50,
+    take: limit, skip: offset,
   })
 
   return NextResponse.json({
@@ -45,4 +49,4 @@ export async function GET(req: NextRequest) {
       isOverdue: a.slaDueAt ? a.slaDueAt < new Date() && a.decision === 'pending' : false,
     })),
   })
-}
+})

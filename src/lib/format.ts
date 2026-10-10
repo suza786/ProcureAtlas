@@ -13,27 +13,38 @@ export function formatUSD(value: number | null | undefined): string {
   return formatCurrency(value, 'USD')
 }
 
-export function formatDate(date: Date | string | null | undefined): string {
-  if (!date) return '—'
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' })
+export interface DateFormatOptions { locale?: 'en' | 'bn'; timeZone?: string }
+function parseDate(date: Date | string | number): Date {
+  if (date instanceof Date) return date
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(date)) return new Date(date.replace(' ', 'T') + 'Z')
+  return new Date(date)
+}
+export function formatDate(date: Date | string | number | null | undefined, options: DateFormatOptions = {}): string {
+  if (date == null || date === '') return '—'
+  const d = parseDate(date)
+  if (!Number.isFinite(d.getTime())) return '—'
+  return d.toLocaleDateString(options.locale === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: options.timeZone ?? 'UTC' })
 }
 
-export function formatDateTime(date: Date | string | null | undefined): string {
-  if (!date) return '—'
-  const d = typeof date === 'string' ? new Date(date) : date
-  return d.toLocaleString('en-US', {
+export function formatDateTime(date: Date | string | number | null | undefined, options: DateFormatOptions = {}): string {
+  if (date == null || date === '') return '—'
+  const d = parseDate(date)
+  if (!Number.isFinite(d.getTime())) return '—'
+  return d.toLocaleString(options.locale === 'bn' ? 'bn-BD' : 'en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: options.timeZone ?? 'UTC',
+    timeZoneName: 'short',
   })
 }
 
 export function daysUntil(date: Date | string | null | undefined): number | null {
   if (!date) return null
   const d = typeof date === 'string' ? new Date(date) : date
+  if (!Number.isFinite(d.getTime())) return null
   const ms = d.getTime() - Date.now()
   return Math.ceil(ms / (1000 * 60 * 60 * 24))
 }

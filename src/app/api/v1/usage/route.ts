@@ -1,10 +1,14 @@
+import { getSubscription } from '@/lib/subscription'
+import { withApiErrors } from '@/lib/api-errors'
+import { requireApiScope } from '@/lib/api-scopes'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { validateApiKey, checkRateLimit, setRateLimitHeaders } from '@/lib/rate-limit'
 
 // GET /api/v1/usage — current API usage stats for the API key's tenant
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const authResult = await validateApiKey(req.headers.get('authorization'))
+  requireApiScope(authResult, 'api:read')
   if (!authResult.valid || !authResult.tenantId) {
     return NextResponse.json({ error: 'Invalid or missing API key' }, { status: 401 })
   }
@@ -22,37 +26,16 @@ export async function GET(req: NextRequest) {
   const last7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
   const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  const [count24h, count7d, count30d, llmStats30d, topEndpoints] = await Promise.all([
-    db.auditLog.count({
-      where: { tenantId: authResult.tenantId, action: { contains: 'api_v1_' }, createdAt: { gte: last24h } },
-    }),
-    db.auditLog.count({
-      where: { tenantId: authResult.tenantId, action: { contains: 'api_v1_' }, createdAt: { gte: last7d } },
-    }),
-    db.auditLog.count({
-      where: { tenantId: authResult.tenantId, action: { contains: 'api_v1_' }, createdAt: { gte: last30d } },
-    }),
-    db.auditLog.aggregate({
-      where: { tenantId: authResult.tenantId, action: { contains: 'api_v1_' }, createdAt: { gte: last30d } },
-      _sum: { llmCostUsd: true, llmInputTokens: true, llmOutputTokens: true },
-    }),
-    db.auditLog.groupBy({
-      by: ['action'],
-      where: { tenantId: authResult.tenantId, action: { contains: 'api_v1_' }, createdAt: { gte: last7d } },
-      _count: true,
-      orderBy: { _count: { action: 'desc' } },
-      take: 10,
-    }),
+  const [count24h, count7d, count30d, llmStats30d, topEndpoints, subscription] = await Promise.all([
+    db.usageEvent.count({ where: { tenantId: authResult.tenantId, kind: 'api_call', createdAt: { gte: last24h } } }),
+    db.usageEvent.count({ where: { tenantId: authResult.tenantId, kind: 'api_call', createdAt: { gte: last7d } } }),
+    db.usageEvent.count({ where: { tenantId: authResult.tenantId, kind: 'api_call', createdAt: { gte: last30d } } }),
+    db.usageEvent.aggregate({ where: { tenantId: authResult.tenantId, kind: 'provider_call', tokenSource: { not: 'reserved_upper_bound' }, createdAt: { gte: last30d } }, _sum: { inputTokens: true, outputTokens: true } }),
+    db.usageEvent.groupBy({ by: ['endpoint'], where: { tenantId: authResult.tenantId, kind: 'api_call', createdAt: { gte: last7d } }, _count: true, orderBy: { _count: { endpoint: 'desc' } }, take: 10 }),
+    getSubscription(authResult.tenantId),
   ])
-
-  // Get subscription limits
-  const subscription = await db.subscription.findUnique({
-    where: { tenantId: authResult.tenantId },
-    select: { plan: true, apiCallsLimit: true, llmTokensLimit: true },
-  })
-
-  const plan = subscription?.plan ?? authResult.tier ?? 'free'
-  const apiLimit = subscription?.apiCallsLimit ?? 100
+  const plan = subscription.plan
+  const apiLimit = subscription.apiCallsLimit
 
   const res = NextResponse.json({
     plan,
@@ -65,11 +48,11 @@ export async function GET(req: NextRequest) {
       utilizationPct: apiLimit > 0 ? Math.round((count30d / apiLimit) * 100 * 100) / 100 : 0,
     },
     llmUsage30d: {
-      totalCostUsd: llmStats30d._sum.llmCostUsd ?? 0,
-      inputTokens: llmStats30d._sum.llmInputTokens ?? 0,
-      outputTokens: llmStats30d._sum.llmOutputTokens ?? 0,
+
+      inputTokens: llmStats30d._sum.inputTokens ?? 0,
+      outputTokens: llmStats30d._sum.outputTokens ?? 0,
     },
-    topEndpoints: topEndpoints.map(e => ({ action: e.action, count: e._count })),
+    topEndpoints: topEndpoints.map(e => ({ action: e.endpoint, count: e._count })),
     rateLimit: {
       remaining: rateLimit.remaining,
       resetAt: rateLimit.resetAt,
@@ -78,4 +61,4 @@ export async function GET(req: NextRequest) {
   })
   setRateLimitHeaders(res, rateLimit)
   return res
-}
+})

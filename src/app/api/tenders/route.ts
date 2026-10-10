@@ -1,18 +1,24 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { getCurrentTenant } from '@/lib/tenant'
+import { pagination } from '@/lib/api-validation'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // GET /api/tenders — list tenders with filters
 // Query params: market, sector, status, search, limit, offset
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
+export const GET = withApiErrors(async function GET(req: NextRequest) {
+  const ctx = await getCurrentTenant()
+  const searchParams = validatedSearch(req)
   const market = searchParams.get('market')
   const sector = searchParams.get('sector')
   const status = searchParams.get('status') ?? 'active'
   const search = searchParams.get('search')
-  const limit = parseInt(searchParams.get('limit') ?? '50', 10)
-  const offset = parseInt(searchParams.get('offset') ?? '0', 10)
+  const { limit } = pagination(searchParams, 50, 100)
+  const { offset } = pagination(searchParams)
 
-  const where: Record<string, unknown> = {}
+  const where: Prisma.TenderWhereInput = {}
   if (market && market !== 'all') where.market = market
   if (sector && sector !== 'all') where.sector = sector
   if (status && status !== 'all') where.status = status
@@ -68,4 +74,4 @@ export async function GET(req: NextRequest) {
       confidence: t.confidence,
     })),
   })
-}
+})

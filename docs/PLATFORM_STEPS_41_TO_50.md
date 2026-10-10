@@ -1,0 +1,30 @@
+# Platform steps 41–50
+
+1. Developer tools accept actual bearer keys, methods, bodies and entity IDs. Write examples request `api:write`; usage comes from the tenant usage ledger. Keys stay in component memory.
+2. Exports stream cursor batches into private durable storage, escape CSV cells and spreadsheet formulas, and fail explicitly at the resource limit. Downloads require tenant-matched bearer authorization, completed metadata and an unexpired 24-hour window. No inline demonstration artifact is returned.
+3. The transaction outbox records real pursuit creation/stage, proposal status and approval events. The separate worker claims jobs conditionally, maintains leases, retries with backoff and attempt limits, and uses stable delivery IDs and signatures. Managers can inspect failures and request scoped retries. Signed inbound sources are bound server-side to tenants and processed by the worker.
+4. Upload bodies are bounded before multipart parsing. File content must match its declared format; archives have expansion limits. Uploads remain quarantined until ClamAV actually scans them and records scan provenance. PDF.js, Mammoth and UTF-8 decoding extract real document text after scanning. Legacy fabricated clean flags cannot authorize downloads. Status checks use bounded backoff and allow manual refresh rather than draining the tenant API quota indefinitely.
+5. Administrators can invite users; recovery links are hashed, expiring and claimed once, with encrypted queued email payloads. Password changes and SCIM deactivation revoke credentials. SCIM supports scoped updates and deactivation, protects owner accounts, and checks reactivation quotas. MFA uses encrypted TOTP secrets, password-confirmed enrollment, enforced login challenges and replay protection; legacy sessions without MFA provenance are blocked.
+6. Company sectors, certifications, turnover, project sectors and JV history use explicit capability facts linked to current verified tenant evidence. Partner facts use supplier IDs. Missing facts are unknown and receive no fabricated credit; input and summary reads are bounded.
+7. Competitor/partner flags and notes use `TenantSupplierAnnotation`. Public supplier profiles no longer expose tenant preferences. Existing global annotations are intentionally not copied into every tenant.
+8. Shared award/buyer/supplier summaries use database aggregates and a short bounded cache, separately from private annotations. Catalog and operational APIs accept bounded pagination; original non-USD values are excluded from USD sums unless normalized provenance exists.
+9. Buyer, API-key prefix, job scheduling, and tenant time/status indexes are present. `EXPLAIN QUERY PLAN` verified buyer, API-key, audit and worker scheduling lookups use indexes.
+10. New random bearer keys use versioned SHA-256 digests. Existing bcrypt keys verify asynchronously and migrate on successful use. Key activity writes are conditionally throttled to one per minute, and rate buckets use unique key IDs.
+
+## Deployment
+
+- Apply the additive migration after taking the normal deployment backup: `node scripts/platform-upgrade-2026-10.mjs --apply --plans`. It also creates a SQLite-consistent backup. The workspace database has already been upgraded; repeat application is safe.
+- Install the production dependencies using the updated `package-lock.json` (`npm ci`). Use a supported modern Node runtime for PDF.js; verification used Node 24. Run the worker as a separate supervised process: `node scripts/worker.mjs`. Use `--once` for a single claim cycle. Deploy the application source, scripts and production dependencies with this worker; the Next standalone server alone is not the worker distribution.
+- Mount `UPLOAD_DIR` and `EXPORT_DIR` on private durable volumes outside `public/`; retain artifact storage for the download window and apply the organization's retention policy afterward.
+- Install ClamAV with current signature definitions and set `CLAMAV_COMMAND` to its executable. Missing/error scans remain quarantined and are retried; no placeholder clean result is used.
+- Set `APP_ENCRYPTION_KEY` to a securely stored base64-encoded random 32-byte key. Keep it stable across replicas and protect its backups; changing it without migration makes existing MFA credentials and queued emails unreadable.
+- Configure HTTPS `APP_ORIGIN`, `RESEND_API_KEY` and `ACCOUNT_EMAIL_FROM` for invitations/recovery. Missing configuration returns an explicit service error. No provider email was sent during verification.
+- Configure both `INBOUND_WEBHOOK_SECRETS` and `INBOUND_WEBHOOK_TENANTS` JSON maps. Each source binds to one tenant ID; request payloads cannot select their own tenant.
+- Keep `DEMO_MODE`, `DEMO_BILLING_SWITCHING`, and `NEXT_PUBLIC_DEMO_MODE` disabled for production. Configure trusted proxy headers only behind a proxy that overwrites them.
+- Existing user-facing capability assertions require verified evidence provenance. Migrating old guessed sectors or private global notes requires an explicit tenant review; this upgrade grants no automatic verified facts.
+
+## Verification
+
+All 429 tests across 55 files passed (`node node_modules/vitest/vitest.mjs run --maxWorkers=2`). TypeScript (`--noEmit --incremental false`), Prisma validation, scoped lint and the production Next build passed. Targeted tests cover real PDF/DOCX extraction, archive and body bounds, quarantine provenance, artifact downloads, CSV escaping, evidence-scoped capabilities, SQL aggregates, worker concurrency/retry, recovery token claims, SCIM boundaries, and MFA challenges.
+
+`node scripts/platform-smoke.mjs` also passed against a disposable database: production HTTP authorization, SQL summaries, private supplier annotations, quarantine denial, CSV artifact generation/download, cross-tenant denial, expiration and credential deactivation. The real worker command exited successfully against the empty fixture outbox; no external provider delivery or live-tenant mutation occurred in this smoke check.

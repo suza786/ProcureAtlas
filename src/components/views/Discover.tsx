@@ -1,6 +1,11 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState, useMemo } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+import { discoverQuery, DISCOVER_PAGE_SIZE } from '@/lib/discover-query'
+
+import { useState, useMemo } from 'react'
 import { useAppStore } from '@/lib/store'
 import {
   formatUSD,
@@ -51,28 +56,18 @@ const MARKETS = ['all', 'BD', 'SG', 'WB', 'ADB', 'UN', 'EU', 'US']
 const SECTORS = ['all', 'Cyber', 'IT', 'Consulting', 'Construction', 'Health', 'Engineering', 'Goods', 'Services']
 
 export function Discover() {
-  const [data, setData] = useState<TendersResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { t, formatDateTime } = useTranslation()
+
   const filters = useAppStore((s) => s.discoverFilters)
   const setFilters = useAppStore((s) => s.setDiscoverFilters)
   const openTender = useAppStore((s) => s.openTender)
+  const filterKey = JSON.stringify(filters)
+  const [page, setPage] = useState({ filterKey, offset: 0 })
+  const offset = page.filterKey === filterKey ? page.offset : 0
 
-  useEffect(() => {
-    let cancelled = false
-    // Defer setLoading to avoid synchronous setState in effect (react-hooks/set-state-in-effect)
-    Promise.resolve().then(() => !cancelled && setLoading(true))
-    const params = new URLSearchParams()
-    if (filters.market !== 'all') params.set('market', filters.market)
-    if (filters.sector !== 'all') params.set('sector', filters.sector)
-    if (filters.status !== 'all') params.set('status', filters.status)
-    if (filters.search) params.set('search', filters.search)
-    fetch(`/api/tenders?${params.toString()}`)
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed')))
-      .then(d => { if (!cancelled) { setData(d); setLoading(false) } })
-      .catch(e => { if (!cancelled) { setError(e.message); setLoading(false) } })
-    return () => { cancelled = true }
-  }, [filters])
+  const { data, loading, error, refetch } = useApiQuery<TendersResponse>(
+    `/api/tenders?${discoverQuery(filters, offset)}`, { debounceMs: 300 }
+  )
 
   // Compute market counts for the chips at top
   const marketCounts = useMemo(() => {
@@ -87,7 +82,7 @@ export function Discover() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Tender Radar</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("Tender Radar")}</h1>
           <p className="text-sm text-slate-500">
             Live aggregation across {MARKETS.length - 1} markets · {data?.total ?? 0} opportunities matching
           </p>
@@ -107,7 +102,7 @@ export function Discover() {
                 : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
             )}
           >
-            {m === 'all' ? 'All Markets' : marketLabel(m)}
+            {m === 'all' ? t("All Markets") : marketLabel(m)}
             {marketCounts[m] !== undefined && (
               <span className={cn(
                 'ml-1.5 px-1.5 py-0.5 rounded-full text-[10px]',
@@ -124,30 +119,29 @@ export function Discover() {
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-white p-3">
         <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
           <Filter className="h-3.5 w-3.5" />
-          Filters
-        </div>
+          {t("Filters")}</div>
         <select
-          value={filters.sector}
+          aria-label={t("Sector")} value={filters.sector}
           onChange={(e) => setFilters({ sector: e.target.value })}
           className="text-xs rounded-md border border-slate-200 bg-white px-2 py-1.5 outline-none focus:border-slate-400"
         >
-          {SECTORS.map(s => <option key={s} value={s}>{s === 'all' ? 'All Sectors' : s}</option>)}
+          {SECTORS.map(s => <option key={s} value={s}>{s === 'all' ? t("All Sectors") : s}</option>)}
         </select>
         <select
-          value={filters.status}
+          aria-label={t("Tender status")} value={filters.status}
           onChange={(e) => setFilters({ status: e.target.value })}
           className="text-xs rounded-md border border-slate-200 bg-white px-2 py-1.5 outline-none focus:border-slate-400"
         >
-          <option value="all">All Status</option>
-          <option value="active">Active</option>
-          <option value="awarded">Awarded</option>
-          <option value="closed">Closed</option>
+          <option value="all">{t("All Status")}</option>
+          <option value="active">{t("Active")}</option>
+          <option value="awarded">{t("Awarded")}</option>
+          <option value="closed">{t("Closed")}</option>
         </select>
         <input
           type="text"
-          value={filters.search}
+          aria-label={t("Search tenders")} value={filters.search}
           onChange={(e) => setFilters({ search: e.target.value })}
-          placeholder="Search title, buyer, description..."
+          placeholder={t("Search title, buyer, description...")}
           className="flex-1 min-w-[12rem] text-xs rounded-md border border-slate-200 bg-white px-2 py-1.5 outline-none focus:border-slate-400"
         />
         {(filters.search || filters.sector !== 'all' || filters.status !== 'all' || filters.market !== 'all') && (
@@ -155,33 +149,32 @@ export function Discover() {
             onClick={() => setFilters({ market: 'all', sector: 'all', status: 'active', search: '' })}
             className="text-xs text-slate-500 hover:text-rose-600 flex items-center gap-1"
           >
-            <X className="h-3 w-3" /> Clear
-          </button>
+            <X className="h-3 w-3" /> {t("Clear")}</button>
         )}
       </div>
 
       {/* Tender table */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading opportunities...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading opportunities...")}</div>
         ) : error ? (
-          <div className="p-8 text-center text-sm text-rose-600">Error: {error}</div>
+          <div role="alert" className="p-8 text-center text-sm text-rose-600">{error} <button className="ml-2 underline" onClick={refetch}>{t("Retry")}</button></div>
         ) : !data || data.items.length === 0 ? (
           <div className="p-12 text-center">
             <Radar className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No opportunities match your filters.</p>
+            <p className="text-sm text-slate-500">{t("No opportunities match your filters.")}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                  <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Opportunity</th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Market</th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sector</th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Value</th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Deadline</th>
-                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Req.</th>
+                  <th className="px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Opportunity")}</th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Market")}</th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Sector")}</th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Value")}</th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Deadline")}</th>
+                  <th className="px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Req.")}</th>
                   <th className="px-2 py-2.5"></th>
                 </tr>
               </thead>
@@ -192,11 +185,10 @@ export function Discover() {
                   return (
                     <tr
                       key={t.id}
-                      onClick={() => openTender(t.id)}
                       className="hover:bg-slate-50 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-3 max-w-md">
-                        <p className="text-sm font-medium text-slate-900 line-clamp-1">{t.title}</p>
+                        <button type="button" onClick={() => openTender(t.id)} className="text-left text-sm font-medium text-slate-900 line-clamp-1 hover:underline focus-visible:outline focus-visible:outline-2">{t.title}</button>
                         <p className="text-xs text-slate-500 mt-0.5">
                           {t.buyer ?? 'Unknown buyer'} · {t.sourcePortal}
                           {t.amendmentCount > 0 && (
@@ -231,7 +223,7 @@ export function Discover() {
                             )}>
                               {days !== null && days >= 0 ? `${days}d` : 'closed'}
                             </span>
-                            <span className="text-[10px] text-slate-500">{formatDate(t.submissionDeadline)}</span>
+                            <span className="text-[10px] text-slate-500">{formatDateTime(t.submissionDeadline)}</span>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400">—</span>
@@ -251,6 +243,15 @@ export function Discover() {
           </div>
         )}
       </div>
+      {!loading && !error && data && data.total > DISCOVER_PAGE_SIZE && (
+        <nav aria-label={t("Opportunity pages")} className="flex items-center justify-between text-sm text-slate-600">
+          <span>{offset + 1}–{Math.min(offset + data.items.length, data.total)} of {data.total}</span>
+          <div className="flex gap-2">
+            <button disabled={offset === 0} onClick={() => setPage({ filterKey, offset: Math.max(0, offset - DISCOVER_PAGE_SIZE) })} className="rounded border px-3 py-1 disabled:opacity-40">{t("Previous")}</button>
+            <button disabled={offset + DISCOVER_PAGE_SIZE >= data.total} onClick={() => setPage({ filterKey, offset: offset + DISCOVER_PAGE_SIZE })} className="rounded border px-3 py-1 disabled:opacity-40">{t("Next")}</button>
+          </div>
+        </nav>
+      )}
     </div>
   )
 }

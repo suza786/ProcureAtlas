@@ -1,10 +1,11 @@
+import { withApiErrors } from '@/lib/api-errors'
+import { requireTenantWithRole } from '@/lib/tenant'
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/admin/system — system health overview for tenant admins
-export async function GET() {
-  const ctx = await getCurrentTenant()
+export const GET = withApiErrors(async function GET() {
+  const { ctx } = await requireTenantWithRole('admin')
 
   const [userCount, pursuitCount, tenderCount, alertCount, auditCount, extractionCount, uploadCount, connectorRuns, apiKeyCount] = await Promise.all([
     db.user.count({ where: { tenantId: ctx.tenantId } }),
@@ -64,4 +65,4 @@ export async function GET() {
     },
     recentConnectorRuns: connectorRuns,
   })
-}
+})

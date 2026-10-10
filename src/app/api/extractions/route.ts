@@ -1,15 +1,19 @@
+import type { Prisma } from '@prisma/client'
+import { validatedSearch, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant'
 
 // GET /api/extractions — list LLM extractions for review queue
-export async function GET(req: NextRequest) {
+export const GET = withApiErrors(async function GET(req: NextRequest) {
   const ctx = await getCurrentTenant()
-  const { searchParams } = new URL(req.url)
+  const searchParams = validatedSearch(req)
+  const { limit, offset } = pagination(searchParams)
   const reviewStatus = searchParams.get('reviewStatus') ?? 'pending'
   const tenderId = searchParams.get('tenderId')
 
-  const where: Record<string, unknown> = { tenantId: ctx.tenantId }
+  const where: Prisma.LlmExtractionWhereInput = { tenantId: ctx.tenantId }
   if (reviewStatus !== 'all') where.reviewStatus = reviewStatus
   if (tenderId) where.tenderId = tenderId
 
@@ -21,7 +25,7 @@ export async function GET(req: NextRequest) {
       reviewedBy: { select: { email: true, name: true } },
     },
     orderBy: { createdAt: 'desc' },
-    take: 50,
+    take: limit, skip: offset,
   })
 
   return NextResponse.json({
@@ -45,4 +49,4 @@ export async function GET(req: NextRequest) {
       createdAt: e.createdAt,
     })),
   })
-}
+})

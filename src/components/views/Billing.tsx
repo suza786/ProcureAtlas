@@ -1,8 +1,12 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
 
 import { useEffect, useState } from 'react'
-import { useAppStore } from '@/lib/store'
-import { formatUSD, formatDate } from '@/lib/format'
+import { apiFetch } from '@/lib/api-client'
+import { PLANS } from '@/lib/plans'
+import { formatCurrencyAmount } from '@/lib/financial-calculations'
+import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
   CreditCard,
@@ -24,6 +28,8 @@ interface UsageItem {
 }
 
 interface BillingData {
+  reservedTokens: number
+  tokenAccounting: { reportedCalls: number; estimatedCalls: number; unsettledCalls: number }
   subscription: {
     id: string
     plan: string
@@ -33,6 +39,7 @@ interface BillingData {
     currentPeriodStart: string
     currentPeriodEnd: string
     cancelAtPeriodEnd: boolean
+    directSwitchEnabled: boolean
   }
   usage: UsageItem[]
   invoices: Array<{
@@ -48,14 +55,6 @@ interface BillingData {
   }>
 }
 
-const PLANS = [
-  { id: 'free', name: 'Free', priceBDT: 0, priceUSD: 0, seats: 1, tenders: 10, pursuits: 1, apiCalls: 100, llmTokens: 5000 },
-  { id: 'solo', name: 'Solo', priceBDT: 2990, priceUSD: 49, seats: 1, tenders: 50, pursuits: 5, apiCalls: 1000, llmTokens: 50000 },
-  { id: 'professional', name: 'Professional', priceBDT: 9900, priceUSD: 149, seats: 3, tenders: 200, pursuits: 20, apiCalls: 5000, llmTokens: 200000 },
-  { id: 'bid_team', name: 'Bid Team', priceBDT: 29900, priceUSD: 399, seats: 10, tenders: 1000, pursuits: 100, apiCalls: 25000, llmTokens: 1000000 },
-  { id: 'enterprise', name: 'Enterprise', priceBDT: -1, priceUSD: -1, seats: 50, tenders: 10000, pursuits: 1000, apiCalls: 100000, llmTokens: 5000000 },
-]
-
 const METRIC_ICONS: Record<string, React.ElementType> = {
   api_calls: Cpu,
   llm_tokens: Cpu,
@@ -65,77 +64,78 @@ const METRIC_ICONS: Record<string, React.ElementType> = {
 }
 
 export function Billing() {
+  const { t, formatDate } = useTranslation()
+
   const [data, setData] = useState<BillingData | null>(null)
   const [loading, setLoading] = useState(true)
   const [changingPlan, setChangingPlan] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const load = () => {
-    fetch('/api/billing/usage')
+    apiFetch('/api/billing/usage')
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(d => { setData(d); setError(null); setLoading(false) })
+      .catch(cause => { setError(cause.message); setLoading(false) })
   }
 
   useEffect(() => { load() }, [])
 
   const changePlan = async (plan: string) => {
-    if (plan === 'enterprise') {
-      alert('Enterprise plan requires custom setup. Please contact sales@procureatlas.ai')
-      return
-    }
+    if (!data?.subscription.directSwitchEnabled) return
     setChangingPlan(plan)
-    await fetch('/api/billing/subscription', {
+    setError(null)
+    try { await apiFetch('/api/billing/subscription', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ plan }),
     })
     load()
-    setChangingPlan(null)
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Unable to change plan') }
+    finally { setChangingPlan(null) }
   }
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading billing data...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Failed to load.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading billing data...")}</div>
+  if (!data) return <div role="alert" className="p-6 text-sm text-rose-600">{error ?? 'Failed to load.'} <button onClick={load} className="underline">{t("Retry")}</button></div>
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <CreditCard className="h-6 w-6 text-slate-700" />
-          Billing & Usage
-        </h1>
+          {t("Billing & Usage")}</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Current plan, usage metrics, and plan selection. Stripe + SSLCommerz integration is scaffolded for production.
+          Current plan, usage metrics, and plan selection.
         </p>
       </div>
+      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
 
       {/* Current plan */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Current Plan</p>
+            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Current Plan")}</p>
             <p className="text-2xl font-semibold text-slate-900 capitalize">{data.subscription.plan}</p>
             <p className="text-xs text-slate-500 mt-1">
               {data.subscription.billingCycle} billing · {data.subscription.seatsIncluded} seat(s) ·
               Status: <span className="font-medium text-emerald-700">{data.subscription.status}</span>
             </p>
             <p className="text-xs text-slate-500 mt-0.5">
-              Period: {formatDate(data.subscription.currentPeriodStart)} → {formatDate(data.subscription.currentPeriodEnd)}
+              {t("Period:")}{formatDate(data.subscription.currentPeriodStart)} → {formatDate(data.subscription.currentPeriodEnd)}
             </p>
           </div>
           {data.subscription.cancelAtPeriodEnd && (
             <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700">
-              cancels at period end
-            </span>
+              {t("cancels at period end")}</span>
           )}
         </div>
       </div>
 
       {/* Usage meters */}
+      {data.tokenAccounting && <p className="text-xs text-slate-600">{t("Provider usage:")}{' '}{data.tokenAccounting.reportedCalls} reported calls, {data.tokenAccounting.estimatedCalls} estimated calls. {data.reservedTokens} tokens reserved for {data.tokenAccounting.unsettledCalls} calls awaiting usage confirmation.</p>}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
           <TrendingUp className="h-4 w-4 text-violet-600" />
-          Current Period Usage
-        </h2>
+          {t("Current Period Usage")}</h2>
         <div className="space-y-3">
           {data.usage.map((u) => {
             const Icon = METRIC_ICONS[u.metricType] ?? FileText
@@ -169,9 +169,9 @@ export function Billing() {
 
       {/* Plan selection */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">Available Plans</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Available Plans")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-          {PLANS.map((p) => {
+          {Object.values(PLANS).map((p) => {
             const isCurrent = data.subscription.plan === p.id
             return (
               <div
@@ -183,7 +183,7 @@ export function Billing() {
               >
                 <p className="text-sm font-semibold text-slate-900">{p.name}</p>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {p.priceUSD === -1 ? 'Custom' : `$${p.priceUSD}/mo`}
+                  {p.priceUSD === -1 ? 'Contact for quote' : `$${p.priceUSD}/mo`}
                 </p>
                 <p className="text-[10px] text-slate-400">
                   {p.priceBDT === -1 ? '' : p.priceBDT === 0 ? 'Free' : `৳${p.priceBDT}/mo`}
@@ -197,16 +197,15 @@ export function Billing() {
                 </div>
                 {isCurrent ? (
                   <div className="mt-2 text-xs font-medium text-emerald-700 flex items-center justify-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" /> Current
-                  </div>
+                    <CheckCircle2 className="h-3 w-3" /> {t("Current")}</div>
                 ) : (
                   <button
                     onClick={() => changePlan(p.id)}
-                    disabled={changingPlan !== null}
+                    disabled={changingPlan !== null || !data.subscription.directSwitchEnabled}
                     className="mt-2 w-full rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-1"
                   >
                     {changingPlan === p.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : null}
-                    Switch to {p.name}
+                    {data.subscription.directSwitchEnabled ? `Switch to ${p.name}` : 'Requires verified billing'}
                   </button>
                 )}
               </div>
@@ -218,13 +217,12 @@ export function Billing() {
       {/* Invoices */}
       <div className="rounded-lg border border-slate-200 bg-white">
         <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Invoices</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{t("Invoices")}</h2>
         </div>
         <div className="divide-y divide-slate-100">
           {data.invoices.length === 0 ? (
             <div className="p-6 text-center text-sm text-slate-500">
-              No invoices yet. Invoices are generated at the end of each billing period.
-            </div>
+              {t("No invoices yet. Invoices are generated at the end of each billing period.")}</div>
           ) : (
             data.invoices.map((inv) => (
               <div key={inv.id} className="px-4 py-2.5 flex items-center justify-between">
@@ -241,7 +239,7 @@ export function Billing() {
                   )}>
                     {inv.status}
                   </span>
-                  <span className="text-sm font-semibold text-slate-900">{formatUSD(inv.amount)}</span>
+                  <span className="text-sm font-semibold text-slate-900">{formatCurrencyAmount(inv.amount, inv.currency)}</span>
                 </div>
               </div>
             ))
@@ -253,11 +251,11 @@ export function Billing() {
         <div className="flex items-start gap-2">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div>
-            <p className="font-medium">Phase 3 — Billing scaffold.</p>
+            <p className="font-medium">{data.subscription.directSwitchEnabled ? 'Demo plan management' : 'Plan changes require verified billing'}</p>
             <p className="mt-1">
-              Plan management and usage metering are live. Stripe (international) and SSLCommerz (Bangladesh)
-              payment integration is scaffolded — production deploy requires API keys and webhook configuration.
-              Switching plans updates the subscription record; no actual payment is processed.
+              {data.subscription.directSwitchEnabled
+                ? 'Demo plan changes do not process a payment.'
+                : 'Your plan updates after a verified payment event. Contact your billing administrator to arrange a plan change.'}
             </p>
           </div>
         </div>

@@ -1,4 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -21,6 +25,7 @@ import {
 interface ComplianceItem {
   id: string
   status: string
+  evidenceValid: boolean
   notes: string | null
   evidenceText: string | null
   confidence: number
@@ -57,95 +62,28 @@ interface ComplianceMatrixData {
 }
 
 export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
+  const { t } = useTranslation()
+
   const [data, setData] = useState<ComplianceMatrixData | null>(null)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'compliant' | 'partial' | 'gap' | 'not_applicable'>('all')
   const goPursuits = useAppStore((s) => s.goPursuits)
 
   useEffect(() => {
-    // Phase 1: derive compliance from pursuit by fetching pursuits and finding this one
-    fetch('/api/pursuits')
-      .then(r => r.json())
-      .then(async (res) => {
-        const p = (res.items ?? []).find((x: { id: string }) => x.id === pursuitId)
-        if (!p) { setLoading(false); return }
-        // Fetch tender detail to get requirement list
-        const tender = await fetch(`/api/tenders/${p.tender.id}`).then(r => r.json())
-        // For Phase 1, we synthesize compliance items by re-running heuristic mapping
-        // In Phase 2, this will be a dedicated /api/pursuits/[id]/compliance endpoint
-        const items: ComplianceItem[] = (tender.requirements ?? []).map((r: {
-          id: string
-          criterion: string
-          category: string
-          isMandatory: boolean
-          threshold: string | null
-          operator: string | null
-          sourceDoc: string | null
-          sourcePage: number | null
-          sourceClause: string | null
-          extractedText: string | null
-        }) => {
-          // Heuristic status (mirrors seed logic)
-          let status: 'compliant' | 'partial' | 'gap' | 'not_applicable' = 'gap'
-          let evidenceTitle: string | null = null
-          const c = r.criterion.toLowerCase()
-          if (c.includes('iso 27001')) { status = 'compliant'; evidenceTitle = 'ISO 27001:2022 — Information Security Management' }
-          else if (c.includes('iso 9001')) { status = 'compliant'; evidenceTitle = 'ISO 9001:2015 — Quality Management' }
-          else if (c.includes('cmmi')) { status = 'compliant'; evidenceTitle = 'CMMI Level 3 — Appraisal' }
-          else if (c.includes('turnover')) { status = 'compliant'; evidenceTitle = 'Audited Financial Statements FY2024' }
-          else if (c.includes('oem')) { status = 'partial'; evidenceTitle = 'Microsoft Authorized Services Partner — Security' }
-          else if (c.includes('similar') || c.includes('project') || c.includes('track record')) { status = 'compliant'; evidenceTitle = 'National ID System — Cybersecurity Hardening' }
-          else if (c.includes('years') && r.threshold?.includes('5')) { status = 'compliant'; evidenceTitle = 'RJSC Incorporation Certificate' }
-          else if (c.includes('years') && r.threshold?.includes('10')) { status = 'compliant'; evidenceTitle = 'RJSC Incorporation Certificate' }
-          else if (c.includes('vat') || c.includes('tax') || c.includes('registration')) { status = 'compliant'; evidenceTitle = 'Trade License (Dhaka South City Corporation)' }
-          else if (c.includes('bid validity') || c.includes('tender security')) { status = 'not_applicable'; evidenceTitle = null }
-          else if (c.includes('local') || c.includes('registered') || c.includes('established') || c.includes('entity')) {
-            status = p.tender.market === 'BD' ? 'compliant' : 'gap'
-            evidenceTitle = status === 'compliant' ? 'Trade License (Dhaka South City Corporation)' : null
-          }
-          else if (c.includes('master') || c.includes('advanced degree')) { status = 'compliant'; evidenceTitle = 'Chief Security Architect — BSc, CISSP, CCSP' }
-          else if (c.includes('world bank') || c.includes('adb')) { status = 'partial'; evidenceTitle = null }
-          return {
-            id: r.id,
-            status,
-            notes: null,
-            evidenceText: evidenceTitle,
-            confidence: status === 'compliant' ? 0.95 : status === 'partial' ? 0.6 : 0,
-            owner: 'owner@atlas-demo.com',
-            dueAt: null,
-            requirement: {
-              id: r.id,
-              criterion: r.criterion,
-              category: r.category,
-              isMandatory: r.isMandatory,
-              threshold: r.threshold,
-              operator: r.operator,
-              sourceDoc: r.sourceDoc,
-              sourcePage: r.sourcePage,
-              sourceClause: r.sourceClause,
-              extractedText: r.extractedText,
-            },
-            evidence: evidenceTitle ? { id: 'synthetic', title: evidenceTitle, category: 'evidence' } : null,
-          }
-        })
-
-        const summary = {
-          total: items.length,
-          compliant: items.filter(i => i.status === 'compliant').length,
-          partial: items.filter(i => i.status === 'partial').length,
-          gap: items.filter(i => i.status === 'gap').length,
-          not_applicable: items.filter(i => i.status === 'not_applicable').length,
-          coveragePct: items.length === 0 ? 0 : Math.round(((items.filter(i => i.status === 'compliant').length + items.filter(i => i.status === 'partial').length * 0.5) / items.length) * 100),
-        }
-
-        setData({ pursuitId, tenderTitle: p.tender.title, tenderId: p.tender.id, items, summary })
-        setLoading(false)
+    let cancelled = false
+    apiFetch(`/api/pursuits/${pursuitId}/compliance`)
+      .then(async response => {
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? 'Unable to load compliance')
+        return result
       })
-      .catch(() => setLoading(false))
+      .then(result => { if (!cancelled) setData(result) })
+      .catch(() => { if (!cancelled) setData(null) })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
   }, [pursuitId])
-
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading Compliance Matrix...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Pursuit not found.</div>
+  if (loading || (data && data.pursuitId !== pursuitId)) return <div className="p-6 text-sm text-slate-500">{t("Loading Compliance Matrix...")}</div>
+  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Pursuit not found.")}</div>
 
   const filteredItems = filter === 'all' ? data.items : data.items.filter(i => i.status === filter)
 
@@ -156,25 +94,23 @@ export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
         onClick={goPursuits}
         className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to Pursuits
-      </button>
+        <ArrowLeft className="h-3.5 w-3.5" /> {t("Back to Pursuits")}</button>
 
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <FileCheck2 className="h-6 w-6 text-emerald-600" />
-          Compliance Matrix
-        </h1>
+          {t("Compliance Matrix")}</h1>
         <p className="text-sm text-slate-500 mt-1">{data.tenderTitle}</p>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <SummaryTile label="Total Requirements" value={data.summary.total} tone="slate" icon={FileCheck2} />
-        <SummaryTile label="Compliant" value={data.summary.compliant} tone="emerald" icon={CheckCircle2} />
-        <SummaryTile label="Partial" value={data.summary.partial} tone="amber" icon={Circle} />
-        <SummaryTile label="Gap" value={data.summary.gap} tone="rose" icon={XCircle} />
-        <SummaryTile label="Coverage" value={`${data.summary.coveragePct}%`} tone="violet" icon={Shield} />
+        <SummaryTile label={t("Total Requirements")} value={data.summary.total} tone="slate" icon={FileCheck2} />
+        <SummaryTile label={t("Compliant")} value={data.summary.compliant} tone="emerald" icon={CheckCircle2} />
+        <SummaryTile label={t("Partial")} value={data.summary.partial} tone="amber" icon={Circle} />
+        <SummaryTile label={t("Gap")} value={data.summary.gap} tone="rose" icon={XCircle} />
+        <SummaryTile label={t("Coverage")} value={`${data.summary.coveragePct}%`} tone="violet" icon={Shield} />
       </div>
 
       {/* Filter chips */}
@@ -201,21 +137,20 @@ export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Requirement</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Category</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Mandatory</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Threshold</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Source</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Evidence</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Requirement")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Category")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Mandatory")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Threshold")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Source")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Evidence")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredItems.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-sm text-slate-500">
-                    No items match this filter.
-                  </td>
+                    {t("No items match this filter.")}</td>
                 </tr>
               ) : (
                 filteredItems.map(item => (
@@ -232,6 +167,7 @@ export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
                       <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
                         {item.requirement.category}
                       </span>
+                      {item.status === 'compliant' && !item.evidenceValid && <p className="text-xs text-rose-600 mt-1">{t("Evidence needs verification or renewal.")}</p>}
                     </td>
                     <td className="px-3 py-3">
                       {item.requirement.isMandatory ? (
@@ -258,8 +194,7 @@ export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
                         </div>
                       ) : (
                         <span className="text-slate-400 flex items-center gap-1">
-                          <AlertCircle className="h-3 w-3" /> No evidence
-                        </span>
+                          <AlertCircle className="h-3 w-3" /> {t("No evidence")}</span>
                       )}
                     </td>
                     <td className="px-3 py-3">
@@ -276,9 +211,8 @@ export function ComplianceMatrix({ pursuitId }: { pursuitId: string }) {
       </div>
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <strong className="text-slate-900">Principle:</strong> Evidence before AI.
-        Every &ldquo;compliant&rdquo; cell above is backed by an evidence entry from the Company Brain.
-        Every &ldquo;gap&rdquo; cell is an explicit, traceable qualification gap — never hidden, never fabricated.
+        <strong className="text-slate-900">{t("Principle:")}</strong> Evidence before AI.
+        Statuses and links reflect saved compliance records. Evidence warnings identify records that need review.
       </div>
     </div>
   )

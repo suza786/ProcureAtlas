@@ -1,3 +1,6 @@
+import { getPlan } from './plans'
+import { meterApiRequest } from './usage-meter'
+import { getSubscription } from './subscription'
 // ProcureAtlas AI — Phase 5 Rate Limiting Middleware
 //
 // Token bucket rate limiting per API key (or IP hash for unauthenticated).
@@ -5,20 +8,7 @@
 // Limits are tier-based: free (100/hr), intelligence (1K/hr), pursuit_pro (5K/hr), team (25K/hr), enterprise (100K/hr).
 
 import { db } from './db'
-import { getCurrentTenant } from './tenant'
-
-const TIER_LIMITS: Record<string, { requestsPerHour: number; burst: number }> = {
-  free: { requestsPerHour: 100, burst: 20 },
-  intelligence: { requestsPerHour: 1000, burst: 50 },
-  pursuit_pro: { requestsPerHour: 5000, burst: 100 },
-  team: { requestsPerHour: 25000, burst: 200 },
-  enterprise: { requestsPerHour: 100000, burst: 500 },
-}
-
-const REFILL_RATE_PER_SECOND = (tier: string): number => {
-  const limit = TIER_LIMITS[tier]
-  return limit ? limit.requestsPerHour / 3600 : 0.03
-}
+import { digestApiKey, verifyApiKey } from './api-key-security'
 
 export interface RateLimitResult {
   allowed: boolean
@@ -35,69 +25,78 @@ export interface RateLimitResult {
 export async function checkRateLimit(
   identifier: string,
   bucketKey: string,
-  tier: string = 'free'
+  tier: string = 'free',
+  customLimits?: { requestsPerHour: number; burst: number }
 ): Promise<RateLimitResult> {
-  const limits = TIER_LIMITS[tier] ?? TIER_LIMITS.free
+  const limits = customLimits ?? getPlan(tier).rate
   const maxTokens = limits.burst
-  const refillPerSecond = REFILL_RATE_PER_SECOND(tier)
+  const refillPerSecond = limits.requestsPerHour / 3600
 
   const now = new Date()
-  const existing = await db.rateLimitBucket.findUnique({
-    where: {
-      identifier_bucketKey: { identifier, bucketKey },
-    },
-  })
 
-  let tokens: number
-  let lastRefilledAt: Date
-
-  if (existing) {
-    // Lazy refill
-    const elapsedSeconds = (now.getTime() - existing.lastRefilledAt.getTime()) / 1000
-    tokens = Math.min(maxTokens, existing.tokens + elapsedSeconds * refillPerSecond)
-    lastRefilledAt = now
-  } else {
-    tokens = maxTokens
-    lastRefilledAt = now
-  }
-
-  if (tokens >= 1) {
-    // Allow and consume token
-    tokens -= 1
-    await db.rateLimitBucket.upsert({
+  // Atomic read-modify-write inside a transaction to prevent race-condition
+  // token overspend under concurrent requests.
+  const outcome = await db.$transaction(async (tx) => {
+    const existing = await tx.rateLimitBucket.findUnique({
       where: {
         identifier_bucketKey: { identifier, bucketKey },
       },
-      update: { tokens, lastRefilledAt },
-      create: { identifier, bucketKey, tokens, lastRefilledAt },
     })
 
-    const resetAt = new Date(now.getTime() + ((maxTokens - tokens) / refillPerSecond) * 1000)
-    return {
-      allowed: true,
-      remaining: Math.floor(tokens),
-      resetAt,
-      retryAfterSeconds: null,
-      limit: limits.requestsPerHour,
+    let tokens: number
+    let lastRefilledAt: Date
+
+    if (existing) {
+      // Lazy refill
+      const elapsedSeconds = (now.getTime() - existing.lastRefilledAt.getTime()) / 1000
+      tokens = Math.min(maxTokens, existing.tokens + elapsedSeconds * refillPerSecond)
+      lastRefilledAt = now
+    } else {
+      tokens = maxTokens
+      lastRefilledAt = now
     }
-  } else {
-    // Rate limited
-    const retryAfterSeconds = Math.ceil((1 - tokens) / refillPerSecond)
-    await db.rateLimitBucket.upsert({
+
+    if (tokens >= 1) {
+      tokens -= 1
+      await tx.rateLimitBucket.upsert({
+        where: {
+          identifier_bucketKey: { identifier, bucketKey },
+        },
+        update: { tokens, lastRefilledAt },
+        create: { identifier, bucketKey, tokens, lastRefilledAt },
+      })
+      return { allowed: true, tokens }
+    }
+
+    // Rate limited — persist the (sub-token) remainder so refill math stays accurate
+    await tx.rateLimitBucket.upsert({
       where: {
         identifier_bucketKey: { identifier, bucketKey },
       },
       update: { tokens, lastRefilledAt },
       create: { identifier, bucketKey, tokens: 0, lastRefilledAt },
     })
+    return { allowed: false, tokens }
+  })
 
+  if (outcome.allowed) {
+    const resetAt = new Date(now.getTime() + ((maxTokens - outcome.tokens) / refillPerSecond) * 1000)
     return {
-      allowed: false,
-      remaining: 0,
-      resetAt: new Date(now.getTime() + retryAfterSeconds * 1000),
-      retryAfterSeconds,
+      allowed: true,
+      remaining: Math.floor(outcome.tokens),
+      resetAt,
+      retryAfterSeconds: null,
       limit: limits.requestsPerHour,
     }
+  }
+
+  const retryAfterSeconds = Math.ceil((1 - outcome.tokens) / refillPerSecond)
+  return {
+    allowed: false,
+    remaining: 0,
+    resetAt: new Date(now.getTime() + retryAfterSeconds * 1000),
+    retryAfterSeconds,
+    limit: limits.requestsPerHour,
   }
 }
 
@@ -118,7 +117,7 @@ export async function validateApiKey(authHeader: string | null): Promise<{
   }
 
   const rawKey = authHeader.slice(7)
-  if (!rawKey.startsWith('pak_')) {
+  if (!/^pak_[a-f0-9]{48}$/.test(rawKey)) {
     return { valid: false }
   }
 
@@ -128,29 +127,29 @@ export async function validateApiKey(authHeader: string | null): Promise<{
     take: 5,
   })
 
-  // Fetch tenant plan separately
-  const tenantIds = [...new Set(candidates.map(k => k.tenantId).filter(Boolean))] as string[]
-  const tenants = tenantIds.length > 0 ? await db.tenant.findMany({
-    where: { id: { in: tenantIds } },
-    select: { id: true, plan: true },
-  }) : []
-  const tenantMap = new Map(tenants.map(t => [t.id, t.plan]))
-
-  const bcrypt = await import('bcryptjs')
   for (const k of candidates) {
     if (k.expiresAt && k.expiresAt < new Date()) continue
-    if (bcrypt.compareSync(rawKey, k.keyHash)) {
-      await db.apiKey.update({
-        where: { id: k.id },
-        data: { lastUsedAt: new Date() },
-      })
+    if (await verifyApiKey(rawKey, k.keyHash)) {
+      const owner = k.userId ? await db.user.findUnique({ where: { id: k.userId }, select: { active: true } }) : null
+      if (k.userId && !owner?.active) return { valid: false }
+      const now = new Date()
+      // Conditional stamp avoids redundant writes across concurrent servers.
+      if (!k.lastUsedAt || now.getTime() - k.lastUsedAt.getTime() >= 60000 || !k.keyHash.startsWith('sha256:')) {
+        await db.apiKey.updateMany({
+          where: { id: k.id, revokedAt: null, OR: [{ lastUsedAt: null }, { lastUsedAt: { lte: new Date(now.getTime() - 60000) } }, { keyHash: { not: { startsWith: 'sha256:' } } }] },
+          data: { lastUsedAt: now, keyHash: digestApiKey(rawKey) },
+        })
+      }
+      if (!k.tenantId) return { valid: false }
+      const subscription = await getSubscription(k.tenantId)
+      await meterApiRequest(k.tenantId, { apiKeyId: k.id })
       return {
         valid: true,
         tenantId: k.tenantId ?? undefined,
         apiKeyId: k.id,
         scopes: k.scopes.split(' '),
-        tier: (k.tenantId && tenantMap.get(k.tenantId)) ?? 'free',
-        identifier: prefix,
+        tier: subscription.plan,
+        identifier: k.id,
       }
     }
   }

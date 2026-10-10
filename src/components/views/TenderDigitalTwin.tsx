@@ -1,4 +1,10 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
+
+import type { ScoringResult } from '@/lib/scoring'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -15,6 +21,7 @@ import {
   scoreBg,
 } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import {
   ExternalLink,
   FileText,
@@ -82,30 +89,6 @@ interface TenderDetail {
   awards: Array<{ id: string; supplier: string; supplierCountry: string | null; contractValue: number | null; currency: string; awardedAt: string; contractNo: string | null; sourceUrl: string | null }>
 }
 
-interface ScoringResult {
-  tenderId: string
-  tenderTitle: string
-  eligibility: {
-    total: number
-    band: string
-    mandatoryPassed: number
-    mandatoryTotal: number
-    components: Array<{ criterion: string; weight: number; score: number; status: string; reason: string }>
-    blocked: boolean
-    blockedReason?: string
-  }
-  opportunityFit: {
-    total: number
-    band: string
-    components: Array<{ criterion: string; weight: number; score: number; status: string; reason: string }>
-  }
-  submissionReadiness: {
-    total: number
-    band: string
-    components: Array<{ criterion: string; weight: number; score: number; status: string; reason: string }>
-  } | null
-  pursuitId: string | null
-}
 
 const CATEGORY_COLOR: Record<string, string> = {
   eligibility: 'bg-sky-500/15 text-sky-700 border-sky-500/30',
@@ -118,6 +101,8 @@ const CATEGORY_COLOR: Record<string, string> = {
 }
 
 export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
+  const { t, formatDateTime } = useTranslation()
+
   const [tender, setTender] = useState<TenderDetail | null>(null)
   const [scoring, setScoring] = useState<ScoringResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -133,16 +118,16 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
     // Defer setLoading to avoid synchronous setState in effect
     Promise.resolve().then(() => !cancelled && setLoading(true))
     Promise.all([
-      fetch(`/api/tenders/${tenderId}`).then(r => r.json()),
-      fetch(`/api/scoring/${tenderId}`).then(r => r.json()),
+      apiFetch(`/api/tenders/${tenderId}`).then(r => r.json()),
+      apiFetch(`/api/scoring/${tenderId}`).then(r => r.json()),
     ])
       .then(([t, s]) => { if (!cancelled) { setTender(t); setScoring(s); setLoading(false) } })
       .catch(e => { if (!cancelled) { console.error(e); setLoading(false) } })
     return () => { cancelled = true }
   }, [tenderId])
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading tender digital twin...</div>
-  if (!tender) return <div className="p-6 text-sm text-rose-600">Tender not found.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading tender digital twin...")}</div>
+  if (!tender) return <div className="p-6 text-sm text-rose-600">{t("Tender not found.")}</div>
 
   const deadlineDays = daysUntil(tender.submissionDeadline)
   const urgency = deadlineUrgency(tender.submissionDeadline)
@@ -154,8 +139,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
         onClick={goDiscover}
         className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors"
       >
-        <ArrowLeft className="h-3.5 w-3.5" /> Back to Discover
-      </button>
+        <ArrowLeft className="h-3.5 w-3.5" /> {t("Back to Discover")}</button>
 
       {/* Header */}
       <div className="flex flex-col gap-3">
@@ -188,16 +172,16 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
           <p className="text-sm text-slate-500" lang="bn">{tender.titleLocal}</p>
         )}
         <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span>Source: <strong className="text-slate-700">{tender.sourcePortal}</strong></span>
-          <span>External ID: <code className="bg-slate-100 px-1 py-0.5 rounded">{tender.externalId ?? '—'}</code></span>
-          <span>Confidence: <strong className="text-slate-700">{Math.round(tender.confidence * 100)}%</strong></span>
+          <span>{t("Source:")}{' '}<strong className="text-slate-700">{tender.sourcePortal}</strong></span>
+          <span>{t("External ID:")}{' '}<code className="bg-slate-100 px-1 py-0.5 rounded">{tender.externalId ?? '—'}</code></span>
+          <span>{t("Confidence:")}{' '}<strong className="text-slate-700">{Math.round(tender.confidence * 100)}%</strong></span>
           <a
             href={tender.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1 text-sky-700 hover:text-sky-900"
           >
-            View on portal <ExternalLink className="h-3 w-3" />
+            {t("View on portal")}<ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>
@@ -206,7 +190,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
       {scoring && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <ScoreCard
-            label="Eligibility Score"
+            label={t("Eligibility Score")}
             score={scoring.eligibility.total}
             band={scoring.eligibility.band}
             subtext={`${scoring.eligibility.mandatoryPassed}/${scoring.eligibility.mandatoryTotal} mandatory requirements met`}
@@ -214,13 +198,13 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
             blockedReason={scoring.eligibility.blockedReason}
           />
           <ScoreCard
-            label="Opportunity Fit"
+            label={t("Opportunity Fit")}
             score={scoring.opportunityFit.total}
             band={scoring.opportunityFit.band}
             subtext="Strategic relevance to your company"
           />
           <ScoreCard
-            label="Submission Readiness"
+            label={t("Submission Readiness")}
             score={scoring.submissionReadiness?.total ?? 0}
             band={scoring.submissionReadiness?.band ?? 'low'}
             subtext={scoring.submissionReadiness ? "Operational bid readiness" : "No pursuit created yet"}
@@ -247,13 +231,13 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
               <span className="text-[9px] uppercase tracking-wider opacity-80">days left</span>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-900">Submission Deadline</p>
+              <p className="text-sm font-semibold text-slate-900">{t("Submission Deadline")}</p>
               <p className="text-xs text-slate-600">{formatDateTime(tender.submissionDeadline)}</p>
             </div>
             {tender.questionDeadline && (
               <div className="text-right text-xs text-slate-600">
-                <p className="font-medium">Question deadline</p>
-                <p>{formatDate(tender.questionDeadline)}</p>
+                <p className="font-medium">{t("Question deadline")}</p>
+                <p>{formatDateTime(tender.questionDeadline)}</p>
                 <p className="text-[10px] text-slate-400">({daysUntil(tender.questionDeadline)}d)</p>
               </div>
             )}
@@ -262,32 +246,31 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
                 onClick={() => useAppStore.getState().openBidRoom(scoring.pursuitId!)}
                 className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
               >
-                <Target className="h-3.5 w-3.5" /> Open Bid Room
-              </button>
+                <Target className="h-3.5 w-3.5" /> {t("Open Bid Room")}</button>
             ) : (
               <button
                 onClick={async () => {
-                  const res = await fetch('/api/pursuits', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ tenderId: tender.id, companyId: '', stage: 'discovering', bidDecision: 'pending' }),
-                  })
-                  if (res.ok) {
+                  try {
+                    const res = await apiFetch('/api/pursuits', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ tenderId: tender.id }),
+                    })
                     const p = await res.json()
+                    if (!res.ok) throw new Error(p.error ?? 'Unable to create pursuit')
                     useAppStore.getState().openBidRoom(p.id)
-                  }
+                  } catch (error) { toast.error(error instanceof Error ? error.message : t("Unable to create pursuit")) }
                 }}
                 className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
               >
-                <Target className="h-3.5 w-3.5" /> Create Pursuit
-              </button>
+                <Target className="h-3.5 w-3.5" /> {t("Create Pursuit")}</button>
             )}
             <button
               onClick={async () => {
                 setExtracting(true)
                 setExtractionResult(null)
                 try {
-                  const res = await fetch(`/api/tenders/${tender.id}/extract-requirements`, {
+                  const res = await apiFetch(`/api/tenders/${tender.id}/extract-requirements`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                   })
@@ -316,7 +299,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
               title="Trigger LLM extraction. Output is pending human review — nothing is written to the Requirement table until approved."
             >
               {extracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {extracting ? 'Extracting...' : 'Extract Requirements (LLM)'}
+              {extracting ? t("Extracting...") : t("Extract Requirements (LLM)")}
             </button>
           </div>
         </div>
@@ -407,16 +390,18 @@ function ScoreCard({
 }
 
 function OverviewTab({ tender }: { tender: TenderDetail }) {
+  const { t, formatDate, formatDateTime } = useTranslation()
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-4">
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Description</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Description")}</h3>
           <p className="text-sm text-slate-700 leading-relaxed">{tender.description ?? 'No description available.'}</p>
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Buyer</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Buyer")}</h3>
           {tender.buyer ? (
             <div className="flex items-start gap-2">
               <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
@@ -432,11 +417,11 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
                 )}
               </div>
             </div>
-          ) : <p className="text-sm text-slate-500">Unknown buyer.</p>}
+          ) : <p className="text-sm text-slate-500">{t("Unknown buyer.")}</p>}
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Contact</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Contact")}</h3>
           <div className="text-xs text-slate-700 space-y-1">
             <p>{tender.contactPerson ?? '—'}</p>
             {tender.contactEmail && <p className="text-sky-700">{tender.contactEmail}</p>}
@@ -446,26 +431,26 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
 
       <div className="space-y-4">
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Financial</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Financial")}</h3>
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <Stat label="Estimated Value" value={`${formatUSD(tender.valueUSD)}`} sub={tender.currency !== 'USD' ? `${formatUSD(tender.estimatedValue)} ${tender.currency}` : undefined} />
-            <Stat label="Tender Security" value={tender.tenderSecurityPct !== null ? `${tender.tenderSecurityPct}%` : '—'} />
-            <Stat label="Performance Security" value={tender.performanceSecurityPct !== null ? `${tender.performanceSecurityPct}%` : '—'} />
-            <Stat label="Bid Validity" value={tender.bidValidityDays !== null ? `${tender.bidValidityDays} days` : '—'} />
+            <Stat label={t("Estimated Value")} value={`${formatUSD(tender.valueUSD)}`} sub={tender.currency !== 'USD' ? `${formatUSD(tender.estimatedValue)} ${tender.currency}` : undefined} />
+            <Stat label={t("Tender Security")} value={tender.tenderSecurityPct !== null ? `${tender.tenderSecurityPct}%` : '—'} />
+            <Stat label={t("Performance Security")} value={tender.performanceSecurityPct !== null ? `${tender.performanceSecurityPct}%` : '—'} />
+            <Stat label={t("Bid Validity")} value={tender.bidValidityDays !== null ? `${tender.bidValidityDays} days` : '—'} />
           </div>
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Timeline</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Timeline")}</h3>
           <div className="space-y-1.5 text-xs">
-            <TimelineRow icon={Calendar} label="Published" value={formatDate(tender.publishedAt)} />
+            <TimelineRow icon={Calendar} label={t("Published")} value={formatDate(tender.publishedAt)} />
             {tender.preBidMeetingAt && (
-              <TimelineRow icon={Building2} label="Pre-bid meeting" value={formatDateTime(tender.preBidMeetingAt)} />
+              <TimelineRow icon={Building2} label={t("Pre-bid meeting")} value={formatDateTime(tender.preBidMeetingAt)} />
             )}
             {tender.questionDeadline && (
-              <TimelineRow icon={AlertCircle} label="Question deadline" value={formatDateTime(tender.questionDeadline)} />
+              <TimelineRow icon={AlertCircle} label={t("Question deadline")} value={formatDateTime(tender.questionDeadline)} />
             )}
-            <TimelineRow icon={Clock} label="Submission deadline" value={formatDateTime(tender.submissionDeadline)} highlight={deadlineUrgency(tender.submissionDeadline) === 'critical'} />
+            <TimelineRow icon={Clock} label={t("Submission deadline")} value={formatDateTime(tender.submissionDeadline)} highlight={deadlineUrgency(tender.submissionDeadline) === 'critical'} />
           </div>
         </div>
 
@@ -497,8 +482,7 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
                   {d.docType && <span className="text-[10px] text-slate-500">· {d.docType}</span>}
                   {d.sourceUrl && (
                     <a href={d.sourceUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-sky-700 hover:text-sky-900 flex items-center gap-1">
-                      <Download className="h-3 w-3" /> Open
-                    </a>
+                      <Download className="h-3 w-3" /> {t("Open")}</a>
                   )}
                 </div>
               ))}
@@ -511,8 +495,10 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
 }
 
 function RequirementsTab({ tender }: { tender: TenderDetail }) {
+  const { t } = useTranslation()
+
   if (tender.requirements.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">No structured requirements extracted yet.</div>
+    return <div className="p-6 text-center text-sm text-slate-500">{t("No structured requirements extracted yet.")}</div>
   }
   return (
     <div className="space-y-2">
@@ -526,9 +512,9 @@ function RequirementsTab({ tender }: { tender: TenderDetail }) {
           <div className="flex items-start gap-3">
             <div className="flex flex-col items-center mt-0.5">
               {r.isMandatory ? (
-                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">Mandatory</span>
+                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">{t("Mandatory")}</span>
               ) : (
-                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">Optional</span>
+                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{t("Optional")}</span>
               )}
             </div>
             <div className="flex-1 min-w-0">
@@ -563,8 +549,10 @@ function RequirementsTab({ tender }: { tender: TenderDetail }) {
 }
 
 function AmendmentsTab({ tender }: { tender: TenderDetail }) {
+  const { t, formatDate, formatDateTime } = useTranslation()
+
   if (tender.amendments.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">No amendments published.</div>
+    return <div className="p-6 text-center text-sm text-slate-500">{t("No amendments published.")}</div>
   }
   return (
     <div className="space-y-3">
@@ -577,18 +565,17 @@ function AmendmentsTab({ tender }: { tender: TenderDetail }) {
             <span className="text-xs text-slate-500">{formatDate(a.publishedAt)}</span>
             {a.affectsDeadline && (
               <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 flex items-center gap-1">
-                <Clock className="h-3 w-3" /> Affects deadline
-              </span>
+                <Clock className="h-3 w-3" /> {t("Affects deadline")}</span>
             )}
           </div>
           <p className="text-sm font-medium text-slate-900">{a.title}</p>
           <p className="text-xs text-slate-600 mt-1">{a.description}</p>
           {a.newDeadline && (
-            <p className="text-xs text-rose-700 mt-1 font-medium">New deadline: {formatDateTime(a.newDeadline)}</p>
+            <p className="text-xs text-rose-700 mt-1 font-medium">{t("New deadline:")}{' '}{formatDateTime(a.newDeadline)}</p>
           )}
           {a.sourceUrl && (
             <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2">
-              View source <ExternalLink className="h-3 w-3" />
+              {t("View source")}<ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
@@ -598,8 +585,10 @@ function AmendmentsTab({ tender }: { tender: TenderDetail }) {
 }
 
 function AwardsTab({ tender }: { tender: TenderDetail }) {
+  const { t, formatDate } = useTranslation()
+
   if (tender.awards.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">No award information published.</div>
+    return <div className="p-6 text-center text-sm text-slate-500">{t("No award information published.")}</div>
   }
   return (
     <div className="space-y-3">
@@ -619,7 +608,7 @@ function AwardsTab({ tender }: { tender: TenderDetail }) {
           </div>
           {a.sourceUrl && (
             <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2">
-              View award notice <ExternalLink className="h-3 w-3" />
+              {t("View award notice")}<ExternalLink className="h-3 w-3" />
             </a>
           )}
         </div>
@@ -629,13 +618,15 @@ function AwardsTab({ tender }: { tender: TenderDetail }) {
 }
 
 function ScoringTab({ scoring }: { scoring: ScoringResult }) {
+  const { t, formatDateTime } = useTranslation()
+
   return (
     <div className="space-y-6">
-      <ScoreSection title="Eligibility Score" score={scoring.eligibility} />
-      <ScoreSection title="Opportunity Fit Score" score={scoring.opportunityFit} />
-      {scoring.submissionReadiness && <ScoreSection title="Submission Readiness Score" score={scoring.submissionReadiness} />}
+      <ScoreSection title={t("Eligibility Score")} score={scoring.eligibility} />
+      <ScoreSection title={t("Opportunity Fit Score")} score={scoring.opportunityFit} />
+      {scoring.submissionReadiness && <ScoreSection title={t("Submission Readiness Score")} score={scoring.submissionReadiness} />}
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <strong className="text-slate-900">Engine:</strong> {scoring.engine} · Generated {formatDateTime(scoring.generatedAt)}.
+        <strong className="text-slate-900">{t("Engine:")}</strong> {scoring.engine} · Generated {formatDateTime(scoring.generatedAt)}.
         All scores are deterministic. LLM extraction is not invoked for scoring.
       </div>
     </div>
@@ -724,6 +715,8 @@ function ExtractionTab({
   extracting: boolean
   onNavigateToQueue: () => void
 }) {
+  const { t } = useTranslation()
+
   const goExtractions = useAppStore((s) => s.goExtractions)
   return (
     <div className="space-y-4">
@@ -731,13 +724,13 @@ function ExtractionTab({
         <div className="flex items-start gap-2">
           <Brain className="h-4 w-4 text-violet-700 shrink-0 mt-0.5" />
           <div className="text-xs">
-            <p className="font-semibold text-violet-900">LLM Requirement Extraction</p>
+            <p className="font-semibold text-violet-900">{t("LLM Requirement Extraction")}</p>
             <p className="text-violet-700 mt-1 leading-relaxed">
               Trigger an LLM call to extract structured requirements from the tender description.
               The LLM is sandboxed: untrusted tender text is wrapped in &lt;UNTRUSTED_DATA&gt; blocks,
               output is validated against a strict Zod schema, every extracted item must include a
-              verbatim sourceSnippet, and the result is queued for <strong>human review</strong> —
-              nothing reaches the Requirement table until approved.
+              verbatim sourceSnippet, and the result is queued for <strong>{t("human review")}</strong> —
+              reviewed requirements stay private to your workspace.
             </p>
           </div>
         </div>
@@ -759,7 +752,7 @@ function ExtractionTab({
             {result.success ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />}
             <div className="flex-1">
               <p className={cn('font-semibold', result.success ? 'text-emerald-800' : 'text-rose-800')}>
-                {result.success ? `Extraction complete — ${result.itemCount} items extracted` : 'Extraction failed'}
+                {result.success ? `Extraction complete — ${result.itemCount} items extracted` : t("Extraction failed")}
               </p>
               {result.error && <p className="text-rose-700 mt-1">{result.error}</p>}
               {result.note && <p className="text-slate-700 mt-1">{result.note}</p>}
@@ -768,8 +761,7 @@ function ExtractionTab({
                   onClick={goExtractions}
                   className="mt-2 text-violet-700 hover:text-violet-900 font-medium flex items-center gap-1"
                 >
-                  Review in queue →
-                </button>
+                  {t("Review in queue →")}</button>
               )}
             </div>
           </div>
@@ -779,13 +771,13 @@ function ExtractionTab({
       {!result && !extracting && (
         <div className="text-center py-8">
           <Sparkles className="h-8 w-8 text-violet-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500 mb-1">No extraction run yet for this tender.</p>
+          <p className="text-sm text-slate-500 mb-1">{t("No extraction run yet for this tender.")}</p>
           <p className="text-xs text-slate-400">Click "Extract Requirements (LLM)" above to trigger an extraction.</p>
         </div>
       )}
 
       <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <p className="font-semibold text-slate-700 mb-1">Guardrails in force</p>
+        <p className="font-semibold text-slate-700 mb-1">{t("Guardrails in force")}</p>
         <ul className="space-y-0.5 list-disc list-inside">
           <li>Backend-only LLM invocation (never client-side)</li>
           <li>Input sanitization — control chars stripped, length capped at 32k chars</li>
@@ -794,7 +786,7 @@ function ExtractionTab({
           <li>Every extracted item must include a sourceSnippet (verbatim quote)</li>
           <li>Confidence threshold: items below 0.7 are flagged for manual review</li>
           <li>Full audit log: model, tokens, latency, cost, prompt hash</li>
-          <li>Nothing persisted to Requirement table without human approval</li>
+          <li>{t("Reviewed requirements are private workspace annotations")}</li>
         </ul>
       </div>
     </div>

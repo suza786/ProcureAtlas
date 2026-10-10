@@ -1,6 +1,7 @@
 'use client'
 
 import { useAppStore } from '@/lib/store'
+import { useTranslation } from '@/hooks/use-translation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -36,7 +37,7 @@ const navItems = [
   { id: 'extractions', label: 'LLM Review Queue', icon: Cpu, action: 'goExtractions' as const },
   { id: 'connectors', label: 'Connectors', icon: Globe, action: 'goConnectors' as const },
   { id: 'audit', label: 'Audit Log', icon: Shield, action: 'goAudit' as const },
-  { id: 'alerts', label: 'Alerts', icon: Bell, action: 'goCommand' as const },
+  { id: 'alerts', label: 'Alerts', icon: Bell, action: 'goNotifications' as const },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, action: 'goAnalytics' as const },
   { id: 'markets', label: 'Markets', icon: Globe, action: 'goMarkets' as const },
 ] as const
@@ -58,7 +59,9 @@ const systemItems = [
   { id: 'settings', label: 'Settings & API Keys', icon: Settings, action: 'goSettings' as const },
 ] as const
 
-export function Sidebar() {
+export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNavigate?: () => void }) {
+  const { t } = useTranslation()
+  const labelKey = (id: string) => ({ 'buyer-intel': 'buyerIntel', 'award-intel': 'awardIntel', 'competitor-intel': 'competitorIntel', 'partner-finder': 'partnerFinder', alerts: 'notifications' }[id] ?? id)
   const view = useAppStore((s) => s.view)
   const auth = useAppStore((s) => s.auth)
   const goCommand = useAppStore((s) => s.goCommand)
@@ -113,7 +116,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="hidden md:flex w-60 shrink-0 flex-col border-r border-slate-200 bg-white">
+    <aside className={cn(mobile ? "flex h-full w-full" : "hidden md:flex w-60", "shrink-0 flex-col border-r border-slate-200 bg-white")}>
       <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-4">
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white text-xs font-bold">
           PA
@@ -124,9 +127,9 @@ export function Sidebar() {
         </div>
       </div>
 
-      <nav className="flex-1 overflow-y-auto p-3">
+      <nav aria-label={t('nav.workspace')} className="flex-1 overflow-y-auto p-3">
         <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Workspace
+          {t('nav.workspace')}
         </div>
         <ul className="space-y-0.5">
           {navItems.map((item) => {
@@ -135,7 +138,8 @@ export function Sidebar() {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => actionMap[item.action]()}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => { actionMap[item.action](); onNavigate?.() }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                     active
@@ -144,7 +148,7 @@ export function Sidebar() {
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate">{t('nav.' + labelKey(item.id))}</span>
                 </button>
               </li>
             )
@@ -152,7 +156,7 @@ export function Sidebar() {
         </ul>
 
         <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Intelligence
+          {t('nav.intelligence')}
         </div>
         <ul className="space-y-0.5">
           {intelligenceItems.map((item) => {
@@ -161,14 +165,15 @@ export function Sidebar() {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => actionMap[item.action]()}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => { actionMap[item.action](); onNavigate?.() }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                     active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate">{t('nav.' + labelKey(item.id))}</span>
                 </button>
               </li>
             )
@@ -176,7 +181,7 @@ export function Sidebar() {
         </ul>
 
         <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          System
+          {t('nav.system')}
         </div>
         <ul className="space-y-0.5">
           {systemItems.map((item) => {
@@ -185,14 +190,15 @@ export function Sidebar() {
             return (
               <li key={item.id}>
                 <button
-                  onClick={() => actionMap[item.action]()}
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => { actionMap[item.action](); onNavigate?.() }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                     active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <span className="truncate">{t('nav.' + labelKey(item.id))}</span>
                 </button>
               </li>
             )
@@ -211,10 +217,10 @@ export function Sidebar() {
             </div>
             <div className="flex flex-col leading-tight flex-1 min-w-0">
               <span className="text-xs font-semibold text-slate-900 truncate">
-                {auth.user?.name ?? 'Demo Mode'}
+                {auth.user?.name ?? t('shell.demoMode')}
               </span>
               <span className="text-[10px] text-slate-500 truncate">
-                {auth.authenticated ? auth.user?.role : 'Not signed in'}
+                {auth.authenticated ? auth.user?.role : t('shell.notSignedIn')}
               </span>
             </div>
           </div>

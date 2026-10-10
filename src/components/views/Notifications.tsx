@@ -1,4 +1,8 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -46,12 +50,14 @@ const SEVERITY_COLORS: Record<string, string> = {
 }
 
 export function Notifications() {
+  const { t, formatDateTime } = useTranslation()
+
   const [items, setItems] = useState<NotificationItem[]>([])
   const [loading, setLoading] = useState(true)
   const [showPrefs, setShowPrefs] = useState(false)
 
   const load = () => {
-    fetch('/api/notifications')
+    apiFetch('/api/notifications')
       .then(r => r.json())
       .then(d => { setItems(d.items ?? []); setLoading(false) })
       .catch(() => setLoading(false))
@@ -60,13 +66,13 @@ export function Notifications() {
   useEffect(() => { load() }, [])
 
   const markAllRead = async () => {
-    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) })
-    load()
+    try { await apiFetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) }); load() }
+    catch { /* Shared API notice displays the failure. */ }
   }
 
   const markRead = async (id: string) => {
-    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
-    load()
+    try { await apiFetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) }); load() }
+    catch { /* Shared API notice displays the failure. */ }
   }
 
   const unreadCount = items.filter(n => !n.readAt).length
@@ -77,8 +83,7 @@ export function Notifications() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
             <Bell className="h-6 w-6 text-slate-700" />
-            Notifications
-          </h1>
+            {t("Notifications")}</h1>
           <p className="text-sm text-slate-500 mt-1">
             {unreadCount > 0 ? `${unreadCount} unread notification(s)` : 'All caught up.'}
           </p>
@@ -86,22 +91,20 @@ export function Notifications() {
         <div className="flex items-center gap-2">
           {unreadCount > 0 && (
             <button onClick={markAllRead} className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-              <CheckCheck className="h-3.5 w-3.5" /> Mark all read
-            </button>
+              <CheckCheck className="h-3.5 w-3.5" /> {t("Mark all read")}</button>
           )}
           <button onClick={() => setShowPrefs(true)} className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-            <SettingsIcon className="h-3.5 w-3.5" /> Preferences
-          </button>
+            <SettingsIcon className="h-3.5 w-3.5" /> {t("Preferences")}</button>
         </div>
       </div>
 
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">Loading notifications...</div>
+          <div className="p-8 text-center text-sm text-slate-500">{t("Loading notifications...")}</div>
         ) : items.length === 0 ? (
           <div className="p-8 text-center">
             <Bell className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-            <p className="text-sm text-slate-500">No notifications.</p>
+            <p className="text-sm text-slate-500">{t("No notifications.")}</p>
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
@@ -140,14 +143,17 @@ export function Notifications() {
 }
 
 function NotificationPrefsModal({ onClose }: { onClose: () => void }) {
+  const { t } = useTranslation()
+
   const [prefs, setPrefs] = useState<Array<{ channel: string; eventType: string; enabled: boolean; minSeverity: string }>>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    fetch('/api/notifications/preferences')
+    apiFetch('/api/notifications/preferences')
       .then(r => r.json())
       .then(d => { setPrefs(d.items ?? []); setLoading(false) })
+      .catch(() => setLoading(false))
   }, [])
 
   const toggle = (channel: string, eventType: string) => {
@@ -160,13 +166,14 @@ function NotificationPrefsModal({ onClose }: { onClose: () => void }) {
 
   const save = async () => {
     setSaving(true)
-    await fetch('/api/notifications/preferences', {
+    try { await apiFetch('/api/notifications/preferences', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ preferences: prefs }),
     })
-    setSaving(false)
     onClose()
+    } catch { /* Shared API notice displays the failure. */ }
+    finally { setSaving(false) }
   }
 
   const channels = ['in_app', 'email', 'slack', 'teams']
@@ -175,17 +182,17 @@ function NotificationPrefsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="w-full max-w-2xl rounded-lg bg-white p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-1">Notification Preferences</h2>
+        <h2 className="text-sm font-semibold text-slate-900 mb-1">{t("Notification Preferences")}</h2>
         <p className="text-xs text-slate-500 mb-4">Configure which notifications you receive on each channel. Email/Slack/Teams delivery requires production configuration.</p>
 
         {loading ? (
-          <p className="text-sm text-slate-500">Loading...</p>
+          <p className="text-sm text-slate-500">{t("Loading...")}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Event Type</th>
+                  <th className="text-left py-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Event Type")}</th>
                   {channels.map(c => <th key={c} className="text-center py-2 text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{c.replace('_', ' ')}</th>)}
                 </tr>
               </thead>
@@ -221,7 +228,7 @@ function NotificationPrefsModal({ onClose }: { onClose: () => void }) {
           <button onClick={save} disabled={saving} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
             {saving ? 'Saving...' : 'Save Preferences'}
           </button>
-          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">Cancel</button>
+          <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">{t("Cancel")}</button>
         </div>
       </div>
     </div>

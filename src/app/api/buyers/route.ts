@@ -1,76 +1,39 @@
+import { Prisma } from '@prisma/client'
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant'
+import { validatedSearch, pagination } from '@/lib/api-validation'
+import { withApiErrors } from '@/lib/api-errors'
+import { normalizeAward } from '@/lib/financial-calculations'
+import { cachedCatalog, organizationAwardStats, summaryStats } from '@/lib/catalog-analytics'
 
-// GET /api/buyers — list buyer organizations with aggregated stats
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const search = searchParams.get('search')
-  const limit = parseInt(searchParams.get('limit') ?? '50', 10)
-
-  const where: Record<string, unknown> = { orgType: 'buyer' }
-  if (search) {
-    where.OR = [
-      { name: { contains: search } },
-      { city: { contains: search } },
-      { country: { contains: search } },
-    ]
-  }
-
-  const buyers = await db.organization.findMany({
-    where,
-    include: {
-      buyers: {
-        include: {
-          _count: { select: { tenders: true } },
-        },
-      },
-      buyerProfile: true,
-    },
-    take: limit,
-    orderBy: { name: 'asc' },
-  })
-
-  // Aggregate award stats per buyer
-  const buyerStats = await Promise.all(
-    buyers.map(async (b) => {
-      const buyerRecord = b.buyers[0]
-      if (!buyerRecord) return null
-      const tenders = await db.tender.findMany({
-        where: { buyerId: buyerRecord.id },
-        select: { id: true, valueUSD: true, sector: true, status: true },
-      })
-      const awards = await db.award.findMany({
-        where: { tender: { buyerId: buyerRecord.id } },
-        include: { supplier: { select: { name: true, country: true } } },
-      })
-      const totalAwardValue = awards.reduce((acc, a) => acc + (a.contractValue ?? 0), 0)
-      const distinctSuppliers = new Set(awards.map(a => a.supplierOrgId)).size
-      const sectorCounts: Record<string, number> = {}
-      tenders.forEach(t => { sectorCounts[t.sector] = (sectorCounts[t.sector] ?? 0) + 1 })
-      const topSectors = Object.entries(sectorCounts).sort((a, b) => b[1] - a[1]).slice(0, 3)
-
-      return {
-        id: b.id,
-        name: b.name,
-        country: b.country,
-        city: b.city,
-        website: b.website,
-        totalTenders: tenders.length,
-        totalAwards: awards.length,
-        totalAwardValueUSD: totalAwardValue,
-        incumbentCount: distinctSuppliers,
-        topSectors,
-        recentAwards: awards.slice(0, 3).map(a => ({
-          supplier: a.supplier.name,
-          supplierCountry: a.supplier.country,
-          contractValue: a.contractValue,
-          awardedAt: a.awardedAt,
-        })),
+export const GET = withApiErrors(async function GET(req: NextRequest) {
+  await getCurrentTenant()
+  const params = validatedSearch(req)
+  const search = params.get('search') ?? ''
+  const { limit, offset } = pagination(params)
+  const result = await cachedCatalog(`buyers:${JSON.stringify({ search, limit, offset })}`, async () => {
+    const where: Prisma.OrganizationWhereInput = { orgType: 'buyer', ...(search ? { OR: [{ name: { contains: search } }, { city: { contains: search } }, { country: { contains: search } }] } : {}) }
+    const [buyers, total] = await Promise.all([
+      db.organization.findMany({ where, take: limit, skip: offset, orderBy: [{ name: 'asc' }, { id: 'asc' }], include: { buyers: { take: 1, orderBy: { id: 'asc' } } } }), db.organization.count({ where }),
+    ])
+    const ids = buyers.flatMap(b => b.buyers.map(buyer => buyer.id))
+    const [stats, tenderGroups, recent] = await Promise.all([
+      organizationAwardStats(ids, 'buyer'),
+      db.tender.groupBy({ by: ['buyerId', 'sector'], where: { buyerId: { in: ids } }, _count: { _all: true } }),
+      ids.length ? db.$queryRaw<Array<{ id: string; buyerId: string }>>(Prisma.sql`WITH ranked AS (SELECT a.id, t."buyerId", ROW_NUMBER() OVER (PARTITION BY t."buyerId" ORDER BY a."awardedAt" DESC, a.id ASC) AS rank FROM "Award" a JOIN "Tender" t ON t.id=a."tenderId" WHERE t."buyerId" IN (${Prisma.join(ids)})) SELECT id, "buyerId" FROM ranked WHERE rank<=3`) : [],
+    ])
+    const awards = await db.award.findMany({ where: { id: { in: recent.map(a => a.id) } }, include: { supplier: { select: { name: true, country: true } } }, orderBy: [{ awardedAt: 'desc' }, { id: 'asc' }] })
+    return { total, items: buyers.map(b => {
+      const buyerId = b.buyers[0]?.id
+      const stat = stats.find(s => s.id === buyerId)
+      const sectors = tenderGroups.filter(t => t.buyerId === buyerId).sort((a,b) => b._count._all-a._count._all)
+      return { id: b.id, name: b.name, country: b.country, city: b.city, website: b.website,
+        ...summaryStats(stat), totalTenders: sectors.reduce((n,g) => n+g._count._all,0), incumbentCount: stat?.distinctWinnerCount ?? 0,
+        topSectors: sectors.slice(0,3).map(g => [g.sector,g._count._all]),
+        recentAwards: awards.filter(a => recent.some(r => r.id === a.id && r.buyerId === buyerId)).map(raw => { const a=normalizeAward(raw, [], 'public'); return { supplier: a.supplier.name, supplierCountry: a.supplier.country, contractValue: a.contractValue, currency: a.currency, valueUSD: a.valueUSD, awardedAt: a.awardedAt } }),
       }
-    })
-  )
-
-  return NextResponse.json({
-    items: buyerStats.filter(Boolean),
+    }) }
   })
-}
+  return NextResponse.json({ ...result, limit, offset, normalizationBasis: 'persisted USD or original USD' })
+})

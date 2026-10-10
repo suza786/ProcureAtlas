@@ -1,6 +1,10 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+import { formatCurrencyAmount } from '@/lib/financial-calculations'
+import { useState } from 'react'
 import { formatUSD, formatDate, marketLabel, marketColor, sectorColor } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
@@ -10,11 +14,15 @@ import {
   BarChart3,
   Globe,
 } from 'lucide-react'
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart as RechartsPie, Pie, Cell, Legend } from 'recharts'
+import { DeferredBarChart, DeferredDonutChart } from '@/components/charts/deferred-charts'
 
 interface AwardData {
   total: number
   totalValueUSD: number
+  averageValueUSD: number | null
+  normalizedCount: number
+  unnormalizedCount: number
+  distinctWinnerCount: number
   byMarket: Array<{ market: string; count: number; totalValue: number }>
   bySector: Array<{ sector: string; count: number; totalValue: number }>
   marketShare: Array<{ id: string; name: string; country: string | null; awardCount: number; totalValue: number }>
@@ -23,6 +31,7 @@ interface AwardData {
     supplier: { id: string; name: string; country: string | null }
     tender: { id: string; title: string; market: string; sector: string; country: string; valueUSD: number | null; buyer: { organization: { name: string } } | null }
     contractValue: number | null
+    valueUSD: number | null
     currency: string
     awardedAt: string
     contractNo: string | null
@@ -36,31 +45,26 @@ const MARKET_COLORS: Record<string, string> = {
 }
 
 export function AwardIntel() {
-  const [data, setData] = useState<AwardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { t, formatDate } = useTranslation()
+
   const [marketFilter, setMarketFilter] = useState('')
   const [sectorFilter, setSectorFilter] = useState('')
 
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (marketFilter) params.set('market', marketFilter)
-    if (sectorFilter) params.set('sector', sectorFilter)
-    fetch(`/api/awards?${params.toString()}`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [marketFilter, sectorFilter])
+  const params = new URLSearchParams()
+  if (marketFilter) params.set('market', marketFilter)
+  if (sectorFilter) params.set('sector', sectorFilter)
+  const { data, loading, error, refetch } = useApiQuery<AwardData>(`/api/awards?${params}`)
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Loading award intelligence...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Failed to load.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading award intelligence...")}</div>
+  if (error) return <div role="alert" className="p-6 text-sm text-rose-600">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Failed to load.")}</div>
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Gavel className="h-6 w-6 text-slate-700" />
-          Award Intelligence
-        </h1>
+          {t("Award Intelligence")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           Award tracking across markets · winner analysis · contract value benchmarking · market share.
         </p>
@@ -68,28 +72,30 @@ export function AwardIntel() {
 
       {/* KPI tiles */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiTile icon={Gavel} label="Total Awards" value={data.total.toString()} tone="emerald" />
-        <KpiTile icon={TrendingUp} label="Total Value" value={formatUSD(data.totalValueUSD)} tone="violet" />
-        <KpiTile icon={BarChart3} label="Avg Value" value={formatUSD(data.total > 0 ? data.totalValueUSD / data.total : 0)} tone="sky" />
-        <KpiTile icon={PieChart} label="Distinct Winners" value={data.marketShare.length.toString()} tone="amber" />
+        <KpiTile icon={Gavel} label={t("Total Awards")} value={data.total.toString()} tone="emerald" />
+        <KpiTile icon={TrendingUp} label={t("Known Value (USD)")} value={data.normalizedCount ? formatUSD(data.totalValueUSD) : t("Unknown")} tone="violet" />
+        <KpiTile icon={BarChart3} label={t("Known Avg (USD)")} value={data.averageValueUSD == null ? t("Unknown") : formatUSD(data.averageValueUSD)} tone="sky" />
+        <KpiTile icon={PieChart} label={t("Distinct Winners")} value={data.distinctWinnerCount.toString()} tone="amber" />
       </div>
+
+      <p className="text-xs text-slate-500">USD values cover {data.normalizedCount} of {data.total} awards; {data.unnormalizedCount} without a known USD value are excluded from value totals, averages and shares.</p>
 
       {/* Filters */}
       <div className="flex gap-2">
         <select
-          value={marketFilter}
+          aria-label={t("Award market")} value={marketFilter}
           onChange={(e) => setMarketFilter(e.target.value)}
           className="text-xs rounded-md border border-slate-200 bg-white px-2 py-1.5"
         >
-          <option value="">All Markets</option>
+          <option value="">{t("All Markets")}</option>
           {['BD', 'SG', 'WB', 'ADB', 'UN', 'EU', 'US'].map(m => <option key={m} value={m}>{marketLabel(m)}</option>)}
         </select>
         <select
-          value={sectorFilter}
+          aria-label={t("Award sector")} value={sectorFilter}
           onChange={(e) => setSectorFilter(e.target.value)}
           className="text-xs rounded-md border border-slate-200 bg-white px-2 py-1.5"
         >
-          <option value="">All Sectors</option>
+          <option value="">{t("All Sectors")}</option>
           {['Cyber', 'IT', 'Consulting', 'Construction', 'Health', 'Engineering'].map(s => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
@@ -97,42 +103,16 @@ export function AwardIntel() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Awards by Market</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Awards by Market")}</h2>
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data.byMarket.map(m => ({ market: marketLabel(m.market), count: m.count, value: Math.round(m.totalValue / 1000) }))}>
-                <XAxis dataKey="market" tick={{ fontSize: 10 }} stroke="#64748b" />
-                <YAxis tick={{ fontSize: 10 }} stroke="#64748b" />
-                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} />
-                <Bar dataKey="count" fill="#0f172a" radius={[4, 4, 0, 0]} name="Awards" />
-              </BarChart>
-            </ResponsiveContainer>
+            <DeferredBarChart label={t("Awards by Market")} data={data.byMarket.map(m => ({ market: marketLabel(m.market), count: m.count, value: Math.round(m.totalValue / 1000) }))} xKey="market" series={[{ key: "count", label: t("Awards"), color: "#0f172a" }]} tickSize={10} />
           </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Market Share by Value (USD K)</h2>
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Share of Known Award Value (USD K)")}</h2>
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsPie>
-                <Pie
-                  data={data.marketShare.slice(0, 6).map(s => ({ name: s.name, value: Math.round(s.totalValue / 1000) }))}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={70}
-                  innerRadius={35}
-                  paddingAngle={2}
-                >
-                  {data.marketShare.slice(0, 6).map((_, i) => (
-                    <Cell key={i} fill={Object.values(MARKET_COLORS)[i % 7]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: '6px', border: '1px solid #e2e8f0', fontSize: '12px' }} formatter={(v: number) => [`$${v}K`, 'Value']} />
-                <Legend wrapperStyle={{ fontSize: '10px', paddingTop: '4px' }} />
-              </RechartsPie>
-            </ResponsiveContainer>
+            <DeferredDonutChart label={t("Share of Known Award Value (USD K)")} data={[...data.marketShare.slice(0, 6).map(s => ({ name: s.name, value: s.totalValue / 1000 })), ...(data.marketShare.length > 6 ? [{ name: t("Other suppliers"), value: data.marketShare.slice(6).reduce((sum, s) => sum + s.totalValue, 0) / 1000 }] : [])]} colors={Object.values(MARKET_COLORS)} outerRadius={70} innerRadius={35} legendSize={10} valueFormatter={value => `$${value}K`} valueLabel={t("Value")} />
           </div>
         </div>
       </div>
@@ -142,8 +122,7 @@ export function AwardIntel() {
         <div className="border-b border-slate-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-violet-600" />
-            Top Suppliers by Award Value
-          </h2>
+            {t("Top Suppliers by Award Value")}</h2>
         </div>
         <div className="divide-y divide-slate-100">
           {data.marketShare.slice(0, 10).map((s, i) => {
@@ -174,18 +153,18 @@ export function AwardIntel() {
       {/* Award list */}
       <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
         <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Recent Awards</h2>
+          <h2 className="text-sm font-semibold text-slate-900">{t("Recent Awards")}</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Tender</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Supplier</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Market</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sector</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">Value</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Awarded</th>
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Tender")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Supplier")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Market")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Sector")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Value")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Awarded")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -204,7 +183,7 @@ export function AwardIntel() {
                   <td className="px-3 py-2.5">
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', sectorColor(a.tender.sector))}>{a.tender.sector}</span>
                   </td>
-                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{formatUSD(a.contractValue)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{formatCurrencyAmount(a.contractValue, a.currency)}<div className="text-[10px] font-normal text-slate-500">{a.valueUSD == null ? 'USD unknown' : `${formatUSD(a.valueUSD)} normalized`}</div></td>
                   <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(a.awardedAt)}</td>
                 </tr>
               ))}

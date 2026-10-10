@@ -1,42 +1,59 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useState } from 'react'
+
+import { apiFetch } from '@/lib/api-client'
+
+import { useEffect, useState } from 'react'
+import { AccountAccess } from '@/components/account/AccountAccess'
 import { useAppStore } from '@/lib/store'
 import { cn } from '@/lib/utils'
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react'
 
 export function SignIn() {
-  const [email, setEmail] = useState('owner@atlas-demo.com')
-  const [password, setPassword] = useState('demo1234')
+  const { t } = useTranslation()
+
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [recovery, setRecovery] = useState(false)
+  const [accountToken, setAccountToken] = useState<string | undefined>()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mfaRequired, setMfaRequired] = useState(false)
+  const [otp, setOtp] = useState('')
   const setAuth = useAppStore((s) => s.setAuth)
   const goCommand = useAppStore((s) => s.goCommand)
+  useEffect(() => { const token = new URL(window.location.href).searchParams.get('accountToken'); if (token) setAccountToken(token) }, [])
+  const backToSignIn = () => {
+    const url = new URL(window.location.href); url.searchParams.delete('accountToken'); window.history.replaceState(null, '', url.pathname + url.search + url.hash)
+    setAccountToken(undefined); setRecovery(false); setPassword(''); setOtp(''); setError(null)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/auth/sign-in', {
+      const res = await apiFetch('/api/auth/sign-in', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(mfaRequired ? { otp } : {}) }),
       })
       const data = await res.json()
+      if (data.mfaRequired) { setMfaRequired(true); return }
       if (!res.ok) {
         setError(data.error ?? 'Sign-in failed')
         return
       }
       // Fetch user info
-      const meRes = await fetch('/api/auth/me')
+      const meRes = await apiFetch('/api/auth/me')
       const me = await meRes.json()
       if (me.authenticated) {
         setAuth({ authenticated: true, user: me.user })
         goCommand()
       }
     } catch (e) {
-      setError('Network error: ' + (e as Error).message)
+      setError((e as Error).message)
     } finally {
       setLoading(false)
     }
@@ -56,22 +73,24 @@ export function SignIn() {
             PA
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900">ProcureAtlas AI</h1>
-          <p className="text-sm text-slate-500 mt-1">Global Tender Intelligence & Bid Operations</p>
+          <p className="text-sm text-slate-500 mt-1">{t("Global Tender Intelligence & Bid Operations")}</p>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-1">Sign in</h2>
+        {recovery || accountToken ? <AccountAccess token={accountToken} onBack={backToSignIn} /> : <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900 mb-1">{t("Sign in")}</h2>
           <p className="text-xs text-slate-500 mb-4">
-            Phase 2 authentication with bcrypt-hashed credentials and session cookies.
-          </p>
+            {t("Sign in to your team's workspace.")}</p>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Email</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t("Email")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="email"
+                  aria-label={t("Email")}
+                  autoComplete="username"
+                  maxLength={254}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -82,11 +101,14 @@ export function SignIn() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Password</label>
+              <label className="block text-xs font-medium text-slate-700 mb-1">{t("Password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
                   type="password"
+                  aria-label={t("Password")}
+                  autoComplete="current-password"
+                  maxLength={72}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
@@ -96,6 +118,7 @@ export function SignIn() {
               </div>
             </div>
 
+            {mfaRequired && <label className="block text-sm">{t("Authenticator code")}<input aria-label={t("Authenticator code")} autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={e => setOtp(e.target.value)} className="w-full rounded border p-2 mt-1" /></label>}
             {error && (
               <div className="flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 p-2.5 text-xs text-rose-700">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -112,17 +135,18 @@ export function SignIn() {
               )}
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" />}
-              {loading ? 'Signing in...' : 'Sign in'}
+              {loading ? 'Signing in...' : t("Sign in")}
             </button>
           </form>
+          <button type="button" onClick={() => { setRecovery(true); setPassword(''); setOtp(''); setError(null) }} className="mt-3 text-sm text-slate-700 underline">{t("Forgot your password?")}</button>
 
-          <div className="mt-4 pt-4 border-t border-slate-100">
+          {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && <div className="mt-4 pt-4 border-t border-slate-100">
             <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700 mb-1">Demo credentials</p>
+              <p className="font-semibold text-slate-700 mb-1">{t("Demo credentials")}</p>
               <ul className="space-y-0.5">
-                <li><code className="bg-white px-1 rounded">owner@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> — Owner</li>
-                <li><code className="bg-white px-1 rounded">manager@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> — Manager</li>
-                <li><code className="bg-white px-1 rounded">contributor@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> — Contributor</li>
+                <li><code className="bg-white px-1 rounded">owner@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Owner")}</li>
+                <li><code className="bg-white px-1 rounded">manager@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Manager")}</li>
+                <li><code className="bg-white px-1 rounded">contributor@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Contributor")}</li>
               </ul>
             </div>
 
@@ -130,10 +154,9 @@ export function SignIn() {
               onClick={handleSkip}
               className="mt-3 w-full text-xs text-slate-500 hover:text-slate-900 transition-colors"
             >
-              Skip — explore in demo mode (read-only)
-            </button>
-          </div>
-        </div>
+              {t("Skip — explore in demo mode (read-only)")}</button>
+          </div>}
+        </div>}
 
         <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-400">
           <ShieldCheck className="h-3 w-3" />

@@ -1,6 +1,10 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
 
-import { useEffect, useState } from 'react'
+
+import { useApiQuery } from '@/hooks/use-api-query'
+
+import { useState } from 'react'
 import { formatUSD } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import {
@@ -34,27 +38,22 @@ interface PartnerData {
 }
 
 export function PartnerFinder() {
-  const [data, setData] = useState<PartnerData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { t } = useTranslation()
+
   const [selected, setSelected] = useState<PartnerSuggestion | null>(null)
 
-  useEffect(() => {
-    fetch('/api/partners')
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [])
+  const { data, loading, error, refetch } = useApiQuery<PartnerData>('/api/partners')
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">Computing partner suggestions...</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">Failed to load.</div>
+  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Computing partner suggestions...")}</div>
+  if (error) return <div role="alert" className="p-6 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Failed to load.")}</div>
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Handshake className="h-6 w-6 text-slate-700" />
-          Partner / JV Finder
-        </h1>
+          {t("Partner / JV Finder")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           AI-assisted matching of complementary companies for consortium / JV / OEM partnerships.
           Every suggestion includes a deterministic match score with explainable dimensions.
@@ -78,7 +77,7 @@ export function PartnerFinder() {
       {/* Suggestions grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {data.suggestions.length === 0 ? (
-          <div className="col-span-2 p-8 text-center text-sm text-slate-500">No partner suggestions available.</div>
+          <div className="col-span-2 p-8 text-center text-sm text-slate-500">{t("No partner suggestions available.")}</div>
         ) : (
           data.suggestions.map((s) => (
             <button
@@ -114,7 +113,7 @@ export function PartnerFinder() {
               {/* Complementary capabilities */}
               {s.complementaryCapabilities.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Complementary Sectors</p>
+                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">{t("Complementary Sectors")}</p>
                   <div className="flex flex-wrap gap-1">
                     {s.complementaryCapabilities.map((c) => (
                       <span key={c} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 font-medium">{c}</span>
@@ -125,7 +124,7 @@ export function PartnerFinder() {
 
               {/* Top reasons */}
               <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">Top Match Reasons</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">{t("Top Match Reasons")}</p>
                 <div className="space-y-0.5">
                   {s.dimensions.slice(0, 2).map((d) => (
                     <div key={d.name} className="flex items-center justify-between text-xs">
@@ -151,8 +150,8 @@ export function PartnerFinder() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Partner Detail</h2>
-              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-900 text-xs">Close ✕</button>
+              <h2 className="text-sm font-semibold text-slate-900">{t("Partner Detail")}</h2>
+              <button onClick={() => setSelected(null)} className="text-slate-400 hover:text-slate-900 text-xs">{t("Close ✕")}</button>
             </div>
 
             <div className="p-6 space-y-4">
@@ -168,7 +167,7 @@ export function PartnerFinder() {
 
               <div className="rounded-md border border-slate-200 p-3 text-center">
                 <p className="text-3xl font-bold text-slate-900">{selected.matchScore}</p>
-                <p className="text-xs text-slate-500">Match Score</p>
+                <p className="text-xs text-slate-500">{t("Match Score")}</p>
                 <span className={cn(
                   'inline-block mt-1 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
                   selected.band === 'high' ? 'bg-emerald-500/15 text-emerald-700' :
@@ -181,7 +180,7 @@ export function PartnerFinder() {
 
               {/* Dimensions */}
               <div>
-                <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Match Dimensions</h4>
+                <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Match Dimensions")}</h4>
                 <div className="space-y-2">
                   {selected.dimensions.map((d) => (
                     <div key={d.name}>
@@ -201,7 +200,7 @@ export function PartnerFinder() {
               {/* Complementary capabilities */}
               {selected.complementaryCapabilities.length > 0 && (
                 <div>
-                  <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Complementary Capabilities</h4>
+                  <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Complementary Capabilities")}</h4>
                   <div className="flex flex-wrap gap-1">
                     {selected.complementaryCapabilities.map((c) => (
                       <span key={c} className="text-xs px-2 py-1 rounded bg-violet-500/10 text-violet-700 font-medium">{c}</span>
@@ -213,7 +212,7 @@ export function PartnerFinder() {
               {/* Geographic overlap */}
               {selected.geographicOverlap.length > 0 && (
                 <div>
-                  <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Geographic Overlap</h4>
+                  <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Geographic Overlap")}</h4>
                   <div className="flex flex-wrap gap-1">
                     {selected.geographicOverlap.map((g) => (
                       <span key={g} className="text-xs px-2 py-1 rounded bg-sky-500/10 text-sky-700 font-medium">{g}</span>

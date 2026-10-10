@@ -1,4 +1,9 @@
 'use client'
+import { useTranslation } from '@/hooks/use-translation'
+
+
+import { apiFetch } from '@/lib/api-client'
+import { InviteUser } from '@/components/account/InviteUser'
 
 import { useEffect, useState } from 'react'
 import { useAppStore } from '@/lib/store'
@@ -65,6 +70,8 @@ interface SystemData {
 }
 
 export function Admin() {
+  const { t, formatDateTime, formatDate } = useTranslation()
+
   const [tab, setTab] = useState<'users' | 'system'>('users')
   const [users, setUsers] = useState<AdminUser[]>([])
   const [system, setSystem] = useState<SystemData | null>(null)
@@ -72,14 +79,14 @@ export function Admin() {
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const loadUsers = () => {
-    fetch('/api/admin/users')
+    apiFetch('/api/admin/users')
       .then(r => r.ok ? r.json() : Promise.reject(new Error('Forbidden')))
       .then(d => { setUsers(d.items ?? []); setLoading(false) })
       .catch(() => { setUsers([]); setLoading(false) })
   }
 
   const loadSystem = () => {
-    fetch('/api/admin/system')
+    apiFetch('/api/admin/system')
       .then(r => r.json())
       .then(d => { setSystem(d); setLoading(false) })
       .catch(() => setLoading(false))
@@ -92,21 +99,23 @@ export function Admin() {
 
   const unlockUser = async (id: string) => {
     setActionLoading(id)
-    await fetch(`/api/admin/users/${id}`, {
+    try { await apiFetch(`/api/admin/users/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ unlockAccount: true }),
     })
     loadUsers()
-    setActionLoading(null)
+    } catch { /* Shared API notice displays the failure. */ }
+    finally { setActionLoading(null) }
   }
 
   const deleteUser = async (id: string) => {
     if (!confirm('Deactivate this user? All sessions will be revoked.')) return
     setActionLoading(id)
-    await fetch(`/api/admin/users/${id}`, { method: 'DELETE' })
+    try { await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' })
     loadUsers()
-    setActionLoading(null)
+    } catch { /* Shared API notice displays the failure. */ }
+    finally { setActionLoading(null) }
   }
 
   return (
@@ -114,12 +123,13 @@ export function Admin() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
           <Shield className="h-6 w-6 text-slate-700" />
-          Admin Console
-        </h1>
+          {t("Admin Console")}</h1>
         <p className="text-sm text-slate-500 mt-1">
           Tenant management, user administration, and system health monitoring.
         </p>
       </div>
+
+      {tab === 'users' && <InviteUser onCreated={loadUsers} />}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-slate-200">
@@ -147,7 +157,7 @@ export function Admin() {
       {tab === 'users' && (
         <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">Loading users...</div>
+            <div className="p-8 text-center text-sm text-slate-500">{t("Loading users...")}</div>
           ) : users.length === 0 ? (
             <div className="p-8 text-center">
               <Shield className="h-8 w-8 text-slate-300 mx-auto mb-3" />
@@ -158,11 +168,11 @@ export function Admin() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">User</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Role</th>
+                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("User")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Role")}</th>
                     <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">MFA</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Last Login</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Last Login")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
@@ -214,7 +224,7 @@ export function Admin() {
                               onClick={() => unlockUser(u.id)}
                               disabled={actionLoading === u.id}
                               className="text-slate-400 hover:text-emerald-600 p-1"
-                              title="Unlock account"
+                              title={t("Unlock account")}
                             >
                               {actionLoading === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
                             </button>
@@ -224,7 +234,7 @@ export function Admin() {
                               onClick={() => deleteUser(u.id)}
                               disabled={actionLoading === u.id}
                               className="text-slate-400 hover:text-rose-600 p-1"
-                              title="Deactivate user"
+                              title={t("Deactivate user")}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
@@ -244,33 +254,32 @@ export function Admin() {
         <div className="space-y-4">
           {/* Stats grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatTile icon={Users} label="Users" value={system.stats.users} tone="sky" />
-            <StatTile icon={Activity} label="Pursuits" value={system.stats.pursuits} tone="violet" />
-            <StatTile icon={AlertCircle} label="Active Alerts" value={system.stats.activeAlerts} tone="rose" />
-            <StatTile icon={KeyRound} label="API Keys" value={system.stats.apiKeys} tone="amber" />
+            <StatTile icon={Users} label={t("Users")} value={system.stats.users} tone="sky" />
+            <StatTile icon={Activity} label={t("Pursuits")} value={system.stats.pursuits} tone="violet" />
+            <StatTile icon={AlertCircle} label={t("Active Alerts")} value={system.stats.activeAlerts} tone="rose" />
+            <StatTile icon={KeyRound} label={t("API Keys")} value={system.stats.apiKeys} tone="amber" />
           </div>
 
           {/* LLM usage */}
           <div className="rounded-lg border border-slate-200 bg-white p-4">
             <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
               <Cpu className="h-4 w-4 text-violet-600" />
-              LLM Usage (Last 30 Days)
-            </h2>
+              {t("LLM Usage (Last 30 Days)")}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">API Calls</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("API Calls")}</p>
                 <p className="text-lg font-semibold text-slate-900">{system.llmUsage.callsLast30Days}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Input Tokens</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Input Tokens")}</p>
                 <p className="text-lg font-semibold text-slate-900">{system.llmUsage.inputTokens.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Output Tokens</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Output Tokens")}</p>
                 <p className="text-lg font-semibold text-slate-900">{system.llmUsage.outputTokens.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Cost (USD)</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Cost (USD)")}</p>
                 <p className="text-lg font-semibold text-slate-900">${system.llmUsage.costUsd.toFixed(4)}</p>
               </div>
             </div>
@@ -281,22 +290,20 @@ export function Admin() {
             <div className="rounded-lg border border-slate-200 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
                 <HardDrive className="h-4 w-4 text-sky-600" />
-                Storage & Data
-              </h2>
+                {t("Storage & Data")}</h2>
               <div className="space-y-2 text-sm">
-                <Row label="File uploads" value={system.stats.fileUploads.toString()} />
-                <Row label="Storage used" value={`${system.storage.totalMb} MB`} />
-                <Row label="Total tenders" value={system.stats.tenders.toString()} />
-                <Row label="LLM extractions" value={system.stats.llmExtractions.toString()} />
-                <Row label="Audit entries" value={system.stats.auditEntries.toString()} />
+                <Row label={t("File uploads")} value={system.stats.fileUploads.toString()} />
+                <Row label={t("Storage used")} value={`${system.storage.totalMb} MB`} />
+                <Row label={t("Total tenders")} value={system.stats.tenders.toString()} />
+                <Row label={t("LLM extractions")} value={system.stats.llmExtractions.toString()} />
+                <Row label={t("Audit entries")} value={system.stats.auditEntries.toString()} />
               </div>
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-white p-4">
               <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
                 <Activity className="h-4 w-4 text-emerald-600" />
-                Recent Connector Runs
-              </h2>
+                {t("Recent Connector Runs")}</h2>
               <div className="space-y-2">
                 {system.recentConnectorRuns.map((r) => (
                   <div key={r.id} className="flex items-center gap-2 text-xs">

@@ -32,6 +32,7 @@ model Tenant {
   auditLogs   AuditLog[]
   fileUploads FileUpload[]
   llmExtractions LlmExtraction[]
+  requirementReviews TenantRequirementReview[]
   notifications Notification[]
   partnerSuggestions PartnerSuggestion[]
   subscription Subscription?
@@ -42,6 +43,7 @@ model Tenant {
   notificationPreferences NotificationPreference[]
   currencyRates CurrencyRate[]
   bidCostEstimates BidCostEstimate[]
+  usageEvents UsageEvent[]
 }
 
 model User {
@@ -51,7 +53,9 @@ model User {
   name          String?
   role          String   @default("viewer") // owner | admin | manager | contributor | viewer
   passwordHash  String?  // Phase 2: bcrypt hash for credentials auth; null for SSO-only users
+  active        Boolean  @default(true)
   mfaEnabled    Boolean  @default(false)
+  mfaLastStep   Int?
   mfaSecret     String?  // Phase 2+: TOTP secret (encrypted at rest in prod)
   mfaBackupCodes String? // Phase 2+: hashed backup codes (JSON array)
   failedLoginCount Int   @default(0)
@@ -71,10 +75,12 @@ model User {
   fileUploads   FileUpload[]
 
   @@index([tenantId])
+  @@index([tenantId, active])
 }
 
 // Phase 2: Session management (NextAuth-compatible shape, simplified)
 model Session {
+  mfaVerifiedAt DateTime?
   id            String   @id @default(cuid())
   userId        String
   token         String   @unique
@@ -82,6 +88,7 @@ model Session {
   ipHash        String?
   userAgent     String?
   createdAt     DateTime @default(now())
+  lastActivityAt DateTime? // sliding idle-timeout stamp, updated on use (throttled)
   revokedAt     DateTime?
 
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -177,6 +184,7 @@ model Tender {
   supplierOrgId   String?
   supplierOrg     Organization? @relation("TenderSupplier", fields: [supplierOrgId], references: [id])
   lots            Lot[]
+  requirementReviews TenantRequirementReview[]
   requirements    Requirement[]
   documents       TenderDocument[]
   amendments      Amendment[]
@@ -191,6 +199,8 @@ model Tender {
   @@index([sector])
   @@index([status])
   @@index([submissionDeadline])
+  @@index([buyerId])
+  @@index([status, submissionDeadline])
 }
 
 model Lot {
@@ -219,6 +229,11 @@ model Requirement {
   criterion     String   // e.g. "Minimum annual turnover"
   operator      String?  // >= | <= | == | contains | mandatory
   threshold     String?  // e.g. "5000000 USD"
+  thresholdAmount Float?
+  thresholdCurrency String?
+  thresholdUnit String?
+  evaluationMetric String?
+  thresholdStatus String @default("unreviewed")
   description   String?
   isMandatory   Boolean  @default(true)
   sourceDoc     String?  // document name where requirement was extracted from
@@ -275,6 +290,10 @@ model Award {
   tenderId      String
   supplierOrgId String
   contractValue Float?
+  valueUSD      Float?
+  normalizationRate Float?
+  normalizationDate DateTime?
+  normalizationSource String?
   currency      String   @default("USD")
   awardedAt     DateTime
   contractNo    String?
@@ -333,6 +352,10 @@ model Evidence {
   verified      Boolean  @default(false)
   verifiedBy    String?
   verifiedAt    DateTime?
+  factMetric    String?
+  factAmount    Float?
+  factCurrency  String?
+  factUnit      String?
   confidence    Float    @default(0.9)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -435,8 +458,10 @@ model Pursuit {
   bidCostEstimates BidCostEstimate[]
 
   @@index([tenantId])
+  @@unique([tenantId, companyId, tenderId])
   @@index([stage])
   @@index([companyId])
+  @@index([tenantId, stage, updatedAt])
 }
 
 model Bid {
@@ -476,6 +501,7 @@ model ComplianceItem {
   evidence      Evidence? @relation(fields: [evidenceId], references: [id])
 
   @@index([pursuitId])
+  @@unique([pursuitId, requirementId])
   @@index([status])
 }
 
@@ -582,6 +608,8 @@ model AuditLog {
   id            String   @id @default(cuid())
   tenantId      String
   userId        String?
+  actorType     String @default("system")
+  apiKeyId      String?
   action        String
   entityType    String
   entityId      String?
@@ -606,6 +634,7 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@index([action])
+  @@index([tenantId, createdAt])
 }
 
 // ============================================================
@@ -613,6 +642,7 @@ model AuditLog {
 // ============================================================
 
 model FileUpload {
+  virusScannedAt DateTime?
   id            String   @id @default(cuid())
   tenantId      String
   uploadedById  String?
@@ -638,6 +668,7 @@ model FileUpload {
   @@index([tenantId])
   @@index([category])
   @@index([evidenceId])
+  @@index([tenantId, createdAt])
 }
 
 // ============================================================
@@ -674,11 +705,13 @@ model LlmExtraction {
   fileUpload    FileUpload? @relation(fields: [fileUploadId], references: [id])
   requestedBy   User?    @relation("LlmExtractionRequestedBy", fields: [requestedById], references: [id])
   reviewedBy    User?    @relation("LlmExtractionReviewedBy", fields: [reviewedById], references: [id])
+  requirementReview TenantRequirementReview?
 
   @@index([tenantId])
   @@index([tenderId])
   @@index([status])
   @@index([reviewStatus])
+  @@index([tenantId, status, createdAt])
 }
 
 // ============================================================
@@ -726,6 +759,7 @@ model ApiKey {
 
   @@index([tenantId])
   @@index([keyHash])
+  @@index([keyPrefix, revokedAt])
 }
 
 // ============================================================
@@ -748,6 +782,7 @@ model Notification {
   @@index([tenantId])
   @@index([userId])
   @@index([readAt])
+  @@index([tenantId, createdAt])
 }
 
 // ============================================================
@@ -846,6 +881,8 @@ model Subscription {
   stripeCustomerId String?
   stripeSubscriptionId String?
   sslcommerzStoreId String?
+  billingVerifiedAt DateTime?
+  billingEventCreatedAt Int @default(0)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -864,6 +901,7 @@ model UsageMetric {
   periodStart     DateTime
   periodEnd       DateTime
   count           Int      @default(0)
+  reservedCount   Int      @default(0)
   limit           Int?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -873,6 +911,33 @@ model UsageMetric {
   @@unique([subscriptionId, metricType, periodStart])
   @@index([tenantId])
   @@index([metricType])
+}
+
+model UsageEvent {
+  id String @id @default(cuid())
+  tenantId String
+  kind String
+  endpoint String?
+  userId String?
+  apiKeyId String?
+  inputTokens Int @default(0)
+  outputTokens Int @default(0)
+  reservedTokens Int @default(0)
+  tokenSource String?
+  createdAt DateTime @default(now())
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  @@index([tenantId, kind, createdAt])
+}
+
+model BillingEvent {
+  id String @id @default(cuid())
+  provider String
+  eventId String
+  tenantId String
+  payloadHash String
+  createdAt DateTime @default(now())
+  @@unique([provider, eventId])
+  @@index([tenantId])
 }
 
 model Invoice {
@@ -908,6 +973,7 @@ model Proposal {
   title           String
   status          String   @default("draft") // draft | in_review | approved | submitted | withdrawn
   currentVersion  Int      @default(1)
+  revision        Int      @default(0)
   totalSections   Int      @default(0)
   completedSections Int    @default(0)
   evidenceCoverage Float   @default(0) // 0-1 — % of sections with evidence backing
@@ -929,6 +995,7 @@ model Proposal {
   @@index([tenantId])
   @@index([pursuitId])
   @@index([status])
+  @@index([tenantId, status, updatedAt])
 }
 
 model ProposalSection {
@@ -937,6 +1004,7 @@ model ProposalSection {
   sectionType     String   // executive_summary | technical_approach | methodology | team | past_performance | pricing | compliance | risk | timeline | appendix
   title           String
   content         String?  // markdown content
+  revision        Int      @default(0)
   wordCount       Int      @default(0)
   status          String   @default("todo") // todo | drafting | in_review | approved | needs_revision
   evidenceIds     String?  // JSON array of Evidence IDs backing this section
@@ -972,6 +1040,7 @@ model ProposalVersion {
   proposal        Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 
   @@index([proposalId])
+  @@unique([proposalId, versionNumber])
   @@index([versionNumber])
 }
 
@@ -1026,6 +1095,7 @@ model WebhookEndpoint {
 
 model WebhookDelivery {
   id              String   @id @default(cuid())
+  eventId         String?  @unique
   tenantId        String
   endpointId      String
   eventType       String
@@ -1048,6 +1118,7 @@ model WebhookDelivery {
   @@index([endpointId])
   @@index([status])
   @@index([nextRetryAt])
+  @@index([tenantId, status, createdAt])
 }
 
 // ============================================================
@@ -1089,7 +1160,7 @@ model CurrencyRate {
 
   tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, baseCurrency, quoteCurrency])
+  @@unique([tenantId, baseCurrency, quoteCurrency, rateDate])
   @@index([tenantId])
 }
 
@@ -1155,7 +1226,7 @@ model Embedding {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([entityType, entityId])
+  @@unique([tenantId, entityType, entityId])
   @@index([tenantId])
   @@index([entityType])
 }
@@ -1165,6 +1236,7 @@ model InboundWebhook {
   tenantId        String?
   source          String   // worldbank | adb | ungm | external_crm | custom
   eventType       String
+  eventId         String?  // null only for historical, unauthenticated records
   signature       String?  // signature from source for verification
   signatureValid  Boolean  @default(false)
   payloadJson     String   // raw payload
@@ -1177,12 +1249,31 @@ model InboundWebhook {
   @@index([tenantId])
   @@index([source])
   @@index([processedStatus])
+  @@unique([source, eventId])
+}
+
+// Tenant reviews are private annotations, never shared canonical requirements.
+model TenantRequirementReview {
+  id           String   @id @default(cuid())
+  tenantId     String
+  extractionId String   @unique
+  tenderId     String
+  itemsJson    String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  extraction LlmExtraction @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+  tender     Tender        @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, tenderId])
 }
 
 model DataExport {
   id              String   @id @default(cuid())
   tenantId        String
   requestedById   String?
+  requestedByApiKeyId String?
   exportType      String   // tenders | pursuits | evidence | audit_log | full_backup | awards
   format          String   @default("json") // json | csv
   status          String   @default("pending") // pending | processing | completed | failed
@@ -1196,6 +1287,7 @@ model DataExport {
 
   @@index([tenantId])
   @@index([status])
+  @@index([tenantId, createdAt])
 }
 
 // ============================================================
@@ -1245,6 +1337,11 @@ model ScimConfig {
 }
 
 model AnalyticsSnapshot {
+  source          String   @default("legacy")
+  observedAt      DateTime?
+  llmCostKnown    Boolean  @default(false)
+  llmInputTokens  Int      @default(0)
+  llmOutputTokens Int      @default(0)
   id              String   @id @default(cuid())
   tenantId        String
   snapshotDate    DateTime
@@ -1289,4 +1386,60 @@ model PwaSettings {
   updatedAt       DateTime @updatedAt
 
   @@index([tenantId])
+}
+model OutboxJob {
+  id String @id @default(cuid())
+  tenantId String
+  kind String
+  payloadJson String
+  status String @default("pending")
+  attempts Int @default(0)
+  maxAttempts Int @default(5)
+  availableAt DateTime @default(now())
+  lockedAt DateTime?
+  lockedBy String?
+  error String?
+  completedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  @@index([status, availableAt])
+  @@index([tenantId, status, createdAt])
+}
+model AccountToken {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  tenantId String
+  kind String
+  expiresAt DateTime
+  usedAt DateTime?
+  attempts Int @default(0)
+  credentialHash String?
+  createdAt DateTime @default(now())
+  @@index([userId, kind])
+  @@index([tenantId, expiresAt])
+}
+model TenantSupplierAnnotation {
+  id String @id @default(cuid())
+  tenantId String
+  organizationId String
+  isCompetitor Boolean @default(false)
+  isPartner Boolean @default(false)
+  notes String?
+  updatedAt DateTime @updatedAt
+  @@unique([tenantId, organizationId])
+}
+model CapabilityFact {
+  id String @id @default(cuid())
+  tenantId String
+  companyId String
+  organizationId String?
+  kind String
+  value String
+  amount Float?
+  currency String?
+  evidenceId String
+  createdAt DateTime @default(now())
+  @@index([tenantId, companyId, kind])
+  @@index([tenantId, organizationId, kind])
 }
