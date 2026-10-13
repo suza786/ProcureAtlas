@@ -86,16 +86,16 @@ export function CompetitorIntel() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-          <Target className="h-6 w-6 text-slate-700" />
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+          <Target className="h-6 w-6 text-foreground" />
           {t("Competitor Intelligence")}</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Supplier profiles with award history, win rates, sector breakdowns, and buyer relationships.
         </p>
       </div>
 
-      <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white p-2">
-        <Search className="h-3.5 w-3.5 text-slate-400 ml-1" />
+      <div className="flex items-center gap-2 rounded-md border border-border bg-card p-2">
+        <Search className="h-3.5 w-3.5 text-muted-foreground ml-1" />
         <input
           type="search"
           aria-label={t("Search competitors")}
@@ -104,51 +104,51 @@ export function CompetitorIntel() {
           placeholder={t("Search competitors by name or country...")}
           className="flex-1 text-xs outline-none bg-transparent"
         />
-        <span className="text-xs text-slate-500">{items.length} suppliers</span>
+        <span className="text-xs text-muted-foreground">{items.length} suppliers</span>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {error ? (
-          <div role="alert" className="p-8 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+          <div role="alert" className="p-8 text-sm text-rose-700 dark:text-rose-300">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
         ) : loading ? (
-          <div className="col-span-2 p-8 text-center text-sm text-slate-500">{t("Loading competitors...")}</div>
+          <div className="col-span-2 p-8 text-center text-sm text-muted-foreground">{t("Loading competitors...")}</div>
         ) : items.length === 0 ? (
-          <div className="col-span-2 p-8 text-center text-sm text-slate-500">{t("No competitors found.")}</div>
+          <div className="col-span-2 p-8 text-center text-sm text-muted-foreground">{t("No competitors found.")}</div>
         ) : (
           items.map((c) => (
             <button
               key={c.id}
               onClick={() => openCompetitorDetail(c.id)}
-              className="text-left rounded-lg border border-slate-200 bg-white p-4 hover:border-slate-300 hover:shadow-sm transition-all"
+              className="text-left rounded-lg border border-border bg-card p-4 hover:border-border hover:shadow-sm transition-all"
             >
               <div className="flex items-start justify-between mb-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-900">{c.name}</h3>
-                  <p className="text-xs text-slate-500">{[c.city, c.country].filter(Boolean).join(', ')}</p>
+                  <h3 className="text-sm font-semibold text-foreground">{c.name}</h3>
+                  <p className="text-xs text-muted-foreground">{[c.city, c.country].filter(Boolean).join(', ')}</p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   {c.isCompetitor && (
-                    <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">competitor</span>
+                    <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">competitor</span>
                   )}
                   {c.isPartner && (
-                    <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700">partner</span>
+                    <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">partner</span>
                   )}
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2 mt-3 text-xs">
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Awards")}</p>
-                  <p className="text-sm font-semibold text-slate-900">{c.stats.totalAwards}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Awards")}</p>
+                  <p className="text-sm font-semibold text-foreground">{c.stats.totalAwards}</p>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Total Value")}</p>
-                  <p className="text-sm font-semibold text-slate-900">{c.stats.normalizedCount ? formatUSD(c.stats.totalAwardValueUSD) : t("Unknown")}</p>
-                  {c.stats.unnormalizedCount > 0 && <p className="text-xs text-slate-500">{c.stats.unnormalizedCount} without FX</p>}
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Total Value")}</p>
+                  <p className="text-sm font-semibold text-foreground">{c.stats.normalizedCount ? formatUSD(c.stats.totalAwardValueUSD) : t("Unknown")}</p>
+                  {c.stats.unnormalizedCount > 0 && <p className="text-xs text-muted-foreground">{c.stats.unnormalizedCount} without FX</p>}
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Avg Value")}</p>
-                  <p className="text-sm font-semibold text-slate-900">{formatUSD(c.stats.averageAwardValueUSD)}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Avg Value")}</p>
+                  <p className="text-sm font-semibold text-foreground">{formatUSD(c.stats.averageAwardValueUSD)}</p>
                 </div>
               </div>
 
@@ -160,13 +160,13 @@ export function CompetitorIntel() {
                 ))}
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold mb-1">{t("Top Buyers")}</p>
+              <div className="mt-3 pt-3 border-t border-border">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">{t("Top Buyers")}</p>
                 <div className="space-y-0.5">
                   {c.stats.topBuyers.slice(0, 3).map(([buyer, count]) => (
                     <div key={buyer} className="flex items-center justify-between text-xs">
-                      <span className="text-slate-700 truncate">{buyer}</span>
-                      <span className="text-slate-500 ml-2">{count}</span>
+                      <span className="text-foreground truncate">{buyer}</span>
+                      <span className="text-muted-foreground ml-2">{count}</span>
                     </div>
                   ))}
                 </div>
@@ -186,26 +186,26 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
 
   const { data, loading, error, refetch } = useApiQuery<CompetitorDetail>(`/api/competitors/${organizationId}`)
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading competitor profile...")}</div>
-  if (error) return <div role="alert" className="p-6 text-sm text-rose-700">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Competitor not found.")}</div>
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">{t("Loading competitor profile...")}</div>
+  if (error) return <div role="alert" className="p-6 text-sm text-rose-700 dark:text-rose-300">{error} <button onClick={refetch} className="underline">{t("Retry")}</button></div>
+  if (!data) return <div className="p-6 text-sm text-rose-600 dark:text-rose-300">{t("Competitor not found.")}</div>
 
   return (
     <div className="space-y-4">
-      <button onClick={goCompetitorIntel} className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900">
+      <button onClick={goCompetitorIntel} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
         <ArrowRight className="h-3.5 w-3.5 rotate-180" /> {t("Back to Competitors")}</button>
 
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{data.name}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{data.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             {[data.city, data.country].filter(Boolean).join(', ')}
-            {data.website && <span> · <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:text-sky-900">{data.website}</a></span>}
+            {data.website && <span> · <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-300">{data.website}</a></span>}
           </p>
         </div>
         <div className="flex flex-col gap-1">
-          {data.isCompetitor && <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">competitor</span>}
-          {data.isPartner && <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700">partner</span>}
+          {data.isCompetitor && <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">competitor</span>}
+          {data.isPartner && <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">partner</span>}
         </div>
       </div>
 
@@ -219,8 +219,8 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
 
       {/* Win trend chart */}
       {data.winTrend.length > 0 && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Win Trend by Year")}</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-foreground mb-3">{t("Win Trend by Year")}</h2>
           <div className="h-48">
             <DeferredBarChart label={t("Win Trend by Year")} data={data.winTrend.map(item => ({ year: item.year, awards: item.count, value: Math.round(item.totalValue / 1000) }))} xKey="year" series={[{ key: "awards", label: t("Awards"), color: "#0f172a" }]} />
           </div>
@@ -229,39 +229,39 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Top buyers */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-sky-600" />
+        <div className="rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-sky-600 dark:text-sky-300" />
               {t("Top Buyers")}</h2>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.topBuyers.map((b, i) => (
               <div key={i} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{b.name}</p>
-                  <p className="text-xs text-slate-500">{b.country} · {b.awardCount} award(s)</p>
+                  <p className="text-sm font-medium text-foreground">{b.name}</p>
+                  <p className="text-xs text-muted-foreground">{b.country} · {b.awardCount} award(s)</p>
                 </div>
-                <p className="text-sm font-semibold text-slate-900">{formatUSD(b.totalValue)}</p>
+                <p className="text-sm font-semibold text-foreground">{formatUSD(b.totalValue)}</p>
               </div>
             ))}
           </div>
         </div>
 
         {/* Sector breakdown */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Globe className="h-4 w-4 text-violet-600" />
+        <div className="rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Globe className="h-4 w-4 text-violet-600 dark:text-violet-300" />
               {t("Sector Breakdown")}</h2>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.sectorBreakdown.map((s) => (
               <div key={s.sector} className="px-4 py-2.5 flex items-center justify-between">
                 <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', sectorColor(s.sector))}>{s.sector}</span>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900">{formatUSD(s.totalValue)}</p>
-                  <p className="text-[10px] text-slate-500">{s.count} award(s)</p>
+                  <p className="text-sm font-semibold text-foreground">{formatUSD(s.totalValue)}</p>
+                  <p className="text-[10px] text-muted-foreground">{s.count} award(s)</p>
                 </div>
               </div>
             ))}
@@ -270,33 +270,33 @@ export function CompetitorDetail({ organizationId }: { organizationId: string })
       </div>
 
       {/* Award history */}
-      <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Award History ({data.awardHistory.length})</h2>
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Award History ({data.awardHistory.length})</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Tender")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Buyer")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Market")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 text-right">{t("Value")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Awarded")}</th>
+              <tr className="border-b border-border bg-muted text-left">
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Tender")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Buyer")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Market")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground text-right">{t("Value")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Awarded")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {data.awardHistory.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-2.5 text-sm font-medium text-slate-900 max-w-xs truncate">{a.tender.title}</td>
-                  <td className="px-3 py-2.5 text-xs text-slate-600">{a.tender.buyer?.organization?.name ?? '—'}</td>
+                <tr key={a.id} className="hover:bg-muted">
+                  <td className="px-4 py-2.5 text-sm font-medium text-foreground max-w-xs truncate">{a.tender.title}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{a.tender.buyer?.organization?.name ?? '—'}</td>
                   <td className="px-3 py-2.5">
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', marketColor(a.tender.market))}>
                       {a.tender.market}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-slate-900">{a.valueUSD == null ? 'Unknown USD value' : formatUSD(a.valueUSD)}<p className="text-xs font-normal text-slate-500">{formatCurrencyAmount(a.contractValue, a.currency)}</p></td>
-                  <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(a.awardedAt)}</td>
+                  <td className="px-3 py-2.5 text-right text-sm font-semibold text-foreground">{a.valueUSD == null ? 'Unknown USD value' : formatUSD(a.valueUSD)}<p className="text-xs font-normal text-muted-foreground">{formatCurrencyAmount(a.contractValue, a.currency)}</p></td>
+                  <td className="px-3 py-2.5 text-xs text-muted-foreground">{formatDate(a.awardedAt)}</td>
                 </tr>
               ))}
             </tbody>
@@ -314,20 +314,20 @@ function StatTile({ icon: Icon, label, value, tone }: {
   tone: 'emerald' | 'sky' | 'violet' | 'amber'
 }) {
   const toneMap: Record<string, string> = {
-    emerald: 'text-emerald-600 bg-emerald-500/10',
-    sky: 'text-sky-600 bg-sky-500/10',
-    violet: 'text-violet-600 bg-violet-500/10',
-    amber: 'text-amber-600 bg-amber-500/10',
+    emerald: 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-300',
+    sky: 'text-sky-600 bg-sky-500/10 dark:text-sky-300',
+    violet: 'text-violet-600 bg-violet-500/10 dark:text-violet-300',
+    amber: 'text-amber-600 bg-amber-500/10 dark:text-amber-300',
   }
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
         <div className={cn('rounded-md p-1', toneMap[tone])}>
           <Icon className="h-3 w-3" />
         </div>
       </div>
-      <p className="text-xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xl font-semibold text-foreground">{value}</p>
     </div>
   )
 }

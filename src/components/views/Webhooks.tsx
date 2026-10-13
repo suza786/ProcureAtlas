@@ -103,16 +103,16 @@ export function Webhooks() {
       <OutboxJobs />
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-            <Webhook className="h-6 w-6 text-slate-700" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <Webhook className="h-6 w-6 text-foreground" />
             {t("Webhooks")}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             Outbound event delivery with HMAC-SHA256 signed payloads and retry with exponential backoff.
           </p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800"
+          className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90"
         >
           <Plus className="h-3.5 w-3.5" /> {t("New Endpoint")}</button>
       </div>
@@ -125,7 +125,7 @@ export function Webhooks() {
             onClick={() => setTab(t)}
             className={cn(
               'px-2.5 py-1 text-xs font-medium rounded-full border',
-              tab === t ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'
+              tab === t ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'
             )}
           >
             {t === 'endpoints' ? `Endpoints (${endpoints.length})` : `Delivery Log (${deliveries.length})`}
@@ -136,32 +136,32 @@ export function Webhooks() {
       {tab === 'endpoints' && (
         <div className="space-y-3">
           {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">{t("Loading...")}</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("Loading...")}</div>
           ) : endpoints.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">{t("No webhook endpoints. Create one to receive event deliveries.")}</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("No webhook endpoints. Create one to receive event deliveries.")}</div>
           ) : (
             endpoints.map(e => (
-              <div key={e.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <div key={e.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-slate-900">{e.name}</h3>
-                      <span className={cn('text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded', e.isActive ? 'bg-emerald-500/15 text-emerald-700' : 'bg-slate-500/15 text-slate-600')}>
+                      <h3 className="text-sm font-semibold text-foreground">{e.name}</h3>
+                      <span className={cn('text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded', e.isActive ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-slate-500/15 text-muted-foreground')}>
                         {e.isActive ? 'active' : 'inactive'}
                       </span>
                       {e.consecutiveFailures > 0 && (
-                        <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">
+                        <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">
                           {e.consecutiveFailures} failures
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">{e.url}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{e.url}</p>
                     <div className="flex flex-wrap gap-1 mt-1.5">
                       {e.events.map(ev => (
-                        <span key={ev} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 font-medium">{ev}</span>
+                        <span key={ev} className="text-[10px] px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 font-medium dark:text-violet-300">{ev}</span>
                       ))}
                     </div>
-                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-500">
+                    <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
                       <span>{e.deliveryCount} deliveries</span>
                       {e.lastTriggeredAt && <span>· Last: {formatDateTime(e.lastTriggeredAt)}</span>}
                       {e.lastResponseCode && <span>· HTTP {e.lastResponseCode}</span>}
@@ -170,12 +170,12 @@ export function Webhooks() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => testEndpoint(e.id)}
-                      className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-[10px] font-medium text-slate-700 hover:bg-slate-50"
+                      className="flex items-center gap-1 rounded-md border border-border px-2 py-1 text-[10px] font-medium text-foreground hover:bg-muted"
                     >
                       <Send className="h-2.5 w-2.5" /> {t("Test")}</button>
                     <button
                       onClick={() => deleteEndpoint(e.id)}
-                      className="text-slate-400 hover:text-rose-600 p-1"
+                      className="text-muted-foreground hover:text-rose-600 p-1 dark:hover:text-rose-300"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -188,41 +188,41 @@ export function Webhooks() {
       )}
 
       {tab === 'deliveries' && (
-        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           {deliveries.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">{t("No deliveries yet.")}</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("No deliveries yet.")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Event")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Endpoint")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Attempts")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">HTTP</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Time")}</th>
+                  <tr className="border-b border-border bg-muted text-left">
+                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Event")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Endpoint")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Status")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Attempts")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">HTTP</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Time")}</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {deliveries.map(d => (
-                    <tr key={d.id} className="hover:bg-slate-50">
-                      <td className="px-4 py-2.5 text-xs font-medium text-slate-900">{d.eventType}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600">{d.endpoint.name}</td>
+                    <tr key={d.id} className="hover:bg-muted">
+                      <td className="px-4 py-2.5 text-xs font-medium text-foreground">{d.eventType}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{d.endpoint.name}</td>
                       <td className="px-3 py-2.5">
                         <span className={cn(
                           'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-                          d.status === 'delivered' ? 'bg-emerald-500/15 text-emerald-700' :
-                          d.status === 'failed' ? 'bg-rose-500/15 text-rose-700' :
-                          d.status === 'retrying' ? 'bg-amber-500/15 text-amber-700' :
-                          'bg-slate-500/15 text-slate-600'
+                          d.status === 'delivered' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+                          d.status === 'failed' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+                          d.status === 'retrying' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                          'bg-slate-500/15 text-muted-foreground'
                         )}>
                           {d.status}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600">{d.attemptCount}/{d.maxAttempts}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-600">{d.responseCode ?? '—'}</td>
-                      <td className="px-3 py-2.5 text-xs text-slate-500">{formatDateTime(d.createdAt)}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{d.attemptCount}/{d.maxAttempts}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{d.responseCode ?? '—'}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{formatDateTime(d.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -242,25 +242,25 @@ export function Webhooks() {
 
       {/* Secret reveal */}
       {createdSecret && (
-        <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={() => setCreatedSecret(null)}>
-          <div className="w-full max-w-md rounded-lg bg-white p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-950/30 z-50 flex items-center justify-center p-4" onClick={() => setCreatedSecret(null)}>
+          <div className="w-full max-w-md rounded-lg bg-card p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-sm font-semibold text-slate-900">{t("Webhook Secret Created")}</h2>
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+              <h2 className="text-sm font-semibold text-foreground">{t("Webhook Secret Created")}</h2>
             </div>
-            <p className="text-xs text-slate-600 mb-2">{t("Copy this signing secret now — it will not be shown again.")}</p>
+            <p className="text-xs text-muted-foreground mb-2">{t("Copy this signing secret now — it will not be shown again.")}</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-slate-900 text-emerald-400 p-2 rounded font-mono break-all">{createdSecret}</code>
+              <code className="flex-1 text-xs bg-slate-950 text-emerald-400 p-2 rounded font-mono break-all">{createdSecret}</code>
               <button
                 onClick={() => { navigator.clipboard.writeText(createdSecret); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
-                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs hover:bg-slate-50"
+                className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs hover:bg-muted"
               >
-                {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+                {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-300" /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <p className="text-[10px] text-slate-500 mt-2">{t("Verify signatures using:")}{' '}<code className="bg-slate-100 px-1 rounded">X-ProcureAtlas-Signature: sha256=...</code></p>
-            <button onClick={() => setCreatedSecret(null)} className="mt-3 text-xs text-slate-500 hover:text-slate-900">{t("Dismiss")}</button>
+            <p className="text-[10px] text-muted-foreground mt-2">{t("Verify signatures using:")}{' '}<code className="bg-muted px-1 rounded">X-ProcureAtlas-Signature: sha256=...</code></p>
+            <button onClick={() => setCreatedSecret(null)} className="mt-3 text-xs text-muted-foreground hover:text-foreground">{t("Dismiss")}</button>
           </div>
         </div>
       )}
@@ -303,20 +303,20 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-lg bg-white p-6" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">{t("Create Webhook Endpoint")}</h2>
+    <div className="fixed inset-0 bg-slate-950/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-lg bg-card p-6" onClick={e => e.stopPropagation()}>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t("Create Webhook Endpoint")}</h2>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Name")}</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t("e.g. Slack notification")} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400" />
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Name")}</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t("e.g. Slack notification")} className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">URL</label>
-            <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400" />
+            <label className="block text-xs font-medium text-foreground mb-1">URL</label>
+            <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Events")}</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Events")}</label>
             <div className="space-y-1 max-h-40 overflow-y-auto">
               {VALID_EVENTS.map(ev => (
                 <label key={ev} className="flex items-center gap-2 text-xs">
@@ -328,17 +328,17 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
                       else setSelectedEvents(selectedEvents.filter(x => x !== ev))
                     }}
                   />
-                  <code className="text-slate-700">{ev}</code>
+                  <code className="text-foreground">{ev}</code>
                 </label>
               ))}
             </div>
           </div>
-          {error && <p className="text-xs text-rose-700">{error}</p>}
+          {error && <p className="text-xs text-rose-700 dark:text-rose-300">{error}</p>}
           <div className="flex gap-2 pt-2">
-            <button onClick={create} disabled={creating} className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">
+            <button onClick={create} disabled={creating} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
               {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               {t("Create")}</button>
-            <button onClick={onClose} className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5">{t("Cancel")}</button>
+            <button onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5">{t("Cancel")}</button>
           </div>
         </div>
       </div>

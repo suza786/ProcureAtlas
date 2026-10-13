@@ -27,16 +27,16 @@ export function MfaSettings({ enabled }: { enabled: boolean }) {
     } catch (cause) { setError(apiErrorMessage(cause)) }
     finally { setBusy(false) }
   }
-  if (signedOut) return <section className="rounded-lg border border-slate-200 bg-white p-4"><p role="status" className="text-sm">{t("Authenticator settings updated. Your sessions and API keys were revoked.")}</p><button onClick={goSignIn} className="mt-3 rounded bg-slate-900 px-3 py-2 text-sm text-white">{t("Sign in again")}</button></section>
-  return <section className="rounded-lg border border-slate-200 bg-white p-4">
+  if (signedOut) return <section className="rounded-lg border border-border bg-card p-4"><p role="status" className="text-sm">{t("Authenticator settings updated. Your sessions and API keys were revoked.")}</p><button onClick={goSignIn} className="mt-3 rounded bg-primary px-3 py-2 text-sm text-primary-foreground">{t("Sign in again")}</button></section>
+  return <section className="rounded-lg border border-border bg-card p-4">
     <h2 className="text-sm font-semibold">{t("Authenticator verification")}</h2>
-    <p className="mt-1 text-sm text-slate-600">{enabled ? t("Enabled. Enter your password and authenticator code to disable it. This signs you out and revokes your API keys.") : t("Add a six-digit authenticator code to protect your account.")}</p>
+    <p className="mt-1 text-sm text-muted-foreground">{enabled ? t("Enabled. Enter your password and authenticator code to disable it. This signs you out and revokes your API keys.") : t("Add a six-digit authenticator code to protect your account.")}</p>
     <form onSubmit={submit} className="mt-3 space-y-3 max-w-md" aria-busy={busy}>
-      <label className="block text-sm">{t("Current password")}<input type="password" required autoComplete="current-password" maxLength={72} value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded border border-slate-300 p-2 focus:ring-2 focus:ring-slate-500" /></label>
-      {setup && <div className="rounded bg-slate-50 p-3 text-sm"><p>{t("In your authenticator app, add this account with the setup key. Finish within 10 minutes.")}</p><code className="mt-2 block break-all select-all font-semibold">{setup.secret}</code><a href={setup.uri} className="mt-2 inline-block underline">{t("Open authenticator app")}</a><p className="mt-2 text-xs text-slate-600">{t("Changing this setting signs you out and revokes your API keys.")}</p></div>}
-      {(setup || enabled) && <label className="block text-sm">{t("Authenticator code")}<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} className="mt-1 w-full rounded border border-slate-300 p-2 focus:ring-2 focus:ring-slate-500" /></label>}
-      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
-      <button disabled={busy} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-60">{busy ? t("Saving…") : enabled ? t("Disable authenticator") : setup ? t("Enable authenticator") : t("Set up authenticator")}</button>
+      <label className="block text-sm">{t("Current password")}<input type="password" required autoComplete="current-password" maxLength={72} value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded border border-border p-2 focus:ring-2 focus:ring-slate-500" /></label>
+      {setup && <div className="rounded bg-muted p-3 text-sm"><p>{t("In your authenticator app, add this account with the setup key. Finish within 10 minutes.")}</p><code className="mt-2 block break-all select-all font-semibold">{setup.secret}</code><a href={setup.uri} className="mt-2 inline-block underline">{t("Open authenticator app")}</a><p className="mt-2 text-xs text-muted-foreground">{t("Changing this setting signs you out and revokes your API keys.")}</p></div>}
+      {(setup || enabled) && <label className="block text-sm">{t("Authenticator code")}<input required inputMode="numeric" pattern="[0-9]{6}" maxLength={6} autoComplete="one-time-code" value={code} onChange={e => setCode(e.target.value)} className="mt-1 w-full rounded border border-border p-2 focus:ring-2 focus:ring-slate-500" /></label>}
+      {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
+      <button disabled={busy} className="rounded bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-60">{busy ? t("Saving…") : enabled ? t("Disable authenticator") : setup ? t("Enable authenticator") : t("Set up authenticator")}</button>
       {setup && <button type="button" disabled={busy} onClick={() => { setSetup(null); setCode(''); setPassword('') }} className="ml-3 text-sm underline">{t("Cancel setup")}</button>}
     </form>
   </section>

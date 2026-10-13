@@ -66,26 +66,26 @@ export function SignIn() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-slate-900 text-white text-lg font-bold mb-3">
+          <div className="inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary text-primary-foreground text-lg font-bold mb-3">
             PA
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">ProcureAtlas AI</h1>
-          <p className="text-sm text-slate-500 mt-1">{t("Global Tender Intelligence & Bid Operations")}</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">ProcureAtlas AI</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t("Global Tender Intelligence & Bid Operations")}</p>
         </div>
 
-        {recovery || accountToken ? <AccountAccess token={accountToken} onBack={backToSignIn} /> : <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900 mb-1">{t("Sign in")}</h2>
-          <p className="text-xs text-slate-500 mb-4">
+        {recovery || accountToken ? <AccountAccess token={accountToken} onBack={backToSignIn} /> : <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-foreground mb-1">{t("Sign in")}</h2>
+          <p className="text-xs text-muted-foreground mb-4">
             {t("Sign in to your team's workspace.")}</p>
 
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t("Email")}</label>
+              <label className="block text-xs font-medium text-foreground mb-1">{t("Email")}</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   type="email"
                   aria-label={t("Email")}
@@ -94,16 +94,16 @@ export function SignIn() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm outline-none focus:border-slate-400"
                   placeholder="you@company.com"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">{t("Password")}</label>
+              <label className="block text-xs font-medium text-foreground mb-1">{t("Password")}</label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <input
                   type="password"
                   aria-label={t("Password")}
@@ -112,7 +112,7 @@ export function SignIn() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full rounded-md border border-slate-200 bg-white pl-9 pr-3 py-2 text-sm outline-none focus:border-slate-400"
+                  className="w-full rounded-md border border-border bg-card pl-9 pr-3 py-2 text-sm outline-none focus:border-slate-400"
                   placeholder="••••••••"
                 />
               </div>
@@ -120,7 +120,7 @@ export function SignIn() {
 
             {mfaRequired && <label className="block text-sm">{t("Authenticator code")}<input aria-label={t("Authenticator code")} autoComplete="one-time-code" inputMode="numeric" pattern="[0-9]{6}" maxLength={6} required value={otp} onChange={e => setOtp(e.target.value)} className="w-full rounded border p-2 mt-1" /></label>}
             {error && (
-              <div className="flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 p-2.5 text-xs text-rose-700">
+              <div className="flex items-start gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 p-2.5 text-xs text-rose-700 dark:text-rose-300">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>
@@ -130,7 +130,7 @@ export function SignIn() {
               type="submit"
               disabled={loading}
               className={cn(
-                'w-full flex items-center justify-center gap-2 rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800 transition-colors',
+                'w-full flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors',
                 loading && 'opacity-70 cursor-not-allowed'
               )}
             >
@@ -138,27 +138,27 @@ export function SignIn() {
               {loading ? 'Signing in...' : t("Sign in")}
             </button>
           </form>
-          <button type="button" onClick={() => { setRecovery(true); setPassword(''); setOtp(''); setError(null) }} className="mt-3 text-sm text-slate-700 underline">{t("Forgot your password?")}</button>
+          <button type="button" onClick={() => { setRecovery(true); setPassword(''); setOtp(''); setError(null) }} className="mt-3 text-sm text-foreground underline">{t("Forgot your password?")}</button>
 
-          {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && <div className="mt-4 pt-4 border-t border-slate-100">
-            <div className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-              <p className="font-semibold text-slate-700 mb-1">{t("Demo credentials")}</p>
+          {process.env.NEXT_PUBLIC_DEMO_MODE === 'true' && <div className="mt-4 pt-4 border-t border-border">
+            <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+              <p className="font-semibold text-foreground mb-1">{t("Demo credentials")}</p>
               <ul className="space-y-0.5">
-                <li><code className="bg-white px-1 rounded">owner@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Owner")}</li>
-                <li><code className="bg-white px-1 rounded">manager@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Manager")}</li>
-                <li><code className="bg-white px-1 rounded">contributor@atlas-demo.com</code> / <code className="bg-white px-1 rounded">demo1234</code> {' '}{t("— Contributor")}</li>
+                <li><code className="bg-card px-1 rounded">owner@atlas-demo.com</code> / <code className="bg-card px-1 rounded">demo1234</code> {' '}{t("— Owner")}</li>
+                <li><code className="bg-card px-1 rounded">manager@atlas-demo.com</code> / <code className="bg-card px-1 rounded">demo1234</code> {' '}{t("— Manager")}</li>
+                <li><code className="bg-card px-1 rounded">contributor@atlas-demo.com</code> / <code className="bg-card px-1 rounded">demo1234</code> {' '}{t("— Contributor")}</li>
               </ul>
             </div>
 
             <button
               onClick={handleSkip}
-              className="mt-3 w-full text-xs text-slate-500 hover:text-slate-900 transition-colors"
+              className="mt-3 w-full text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               {t("Skip — explore in demo mode (read-only)")}</button>
           </div>}
         </div>}
 
-        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-slate-400">
+        <div className="mt-6 flex items-center justify-center gap-2 text-[10px] text-muted-foreground">
           <ShieldCheck className="h-3 w-3" />
           <span>Account lockout after 5 failed attempts · Session TTL 7 days · Audit logged</span>
         </div>

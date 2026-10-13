@@ -49,16 +49,16 @@ export function Developer() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-          <Code2 className="h-6 w-6 text-slate-700" />
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+          <Code2 className="h-6 w-6 text-foreground" />
           {t("Developer Portal")}</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Public API marketplace, interactive explorer, and documentation. Versioned REST API at <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">/api/v1/*</code>.
+        <p className="text-sm text-muted-foreground mt-1">
+          Public API marketplace, interactive explorer, and documentation. Versioned REST API at <code className="text-[11px] bg-muted px-1 py-0.5 rounded">/api/v1/*</code>.
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200">
+      <div className="flex items-center gap-1 border-b border-border">
         {[
           { id: 'docs', label: 'API Docs', icon: BookOpen },
           { id: 'keys', label: 'API Keys', icon: Key },
@@ -72,7 +72,7 @@ export function Developer() {
               onClick={() => setTab(t.id as typeof tab)}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'
+                tab === t.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -112,10 +112,10 @@ const ENDPOINTS = [
 ]
 
 const METHOD_COLORS: Record<string, string> = {
-  GET: 'bg-sky-500/15 text-sky-700',
-  POST: 'bg-emerald-500/15 text-emerald-700',
-  PATCH: 'bg-amber-500/15 text-amber-700',
-  DELETE: 'bg-rose-500/15 text-rose-700',
+  GET: 'bg-sky-500/15 text-sky-700 dark:text-sky-300',
+  POST: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  PATCH: 'bg-amber-500/15 text-amber-700 dark:text-amber-300',
+  DELETE: 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
 }
 
 function ApiDocs() {
@@ -124,34 +124,34 @@ function ApiDocs() {
   return (
     <div className="space-y-4">
       {/* Quick start */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-2">{t("Quick Start")}</h2>
-        <p className="text-xs text-slate-600 mb-3">The public API uses Bearer keys with api:read or api:write scopes. Create a key in the API Keys tab. Inbound webhooks use their configured signature authentication.</p>
-        <div className="rounded-md bg-slate-900 text-slate-100 p-3 text-xs font-mono overflow-x-auto">
-          <div className="text-slate-400"># List tenders</div>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-2">{t("Quick Start")}</h2>
+        <p className="text-xs text-muted-foreground mb-3">The public API uses Bearer keys with api:read or api:write scopes. Create a key in the API Keys tab. Inbound webhooks use their configured signature authentication.</p>
+        <div className="rounded-md bg-slate-950 text-slate-100 p-3 text-xs font-mono overflow-x-auto">
+          <div className="text-muted-foreground"># List tenders</div>
           <div>curl -X GET <span className="text-sky-400">"https://your-domain.com/api/v1/tenders?market=BD&limit=5"</span> \</div>
           <div className="ml-4">-H <span className="text-emerald-400">"Authorization: Bearer pak_YOUR_API_KEY"</span></div>
-          <div className="mt-2 text-slate-400"># Response includes rate limit headers</div>
-          <div className="text-slate-500"># X-RateLimit-Limit: 200</div>
-          <div className="text-slate-500"># X-RateLimit-Remaining: 198</div>
-          <div className="text-slate-500"># X-RateLimit-Reset: 2026-10-01T12:00:00Z</div>
+          <div className="mt-2 text-muted-foreground"># Response includes rate limit headers</div>
+          <div className="text-muted-foreground"># X-RateLimit-Limit: 200</div>
+          <div className="text-muted-foreground"># X-RateLimit-Remaining: 198</div>
+          <div className="text-muted-foreground"># X-RateLimit-Reset: 2026-10-01T12:00:00Z</div>
         </div>
       </div>
 
       {/* Endpoints */}
-      <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">Endpoints ({ENDPOINTS.length})</h2>
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">Endpoints ({ENDPOINTS.length})</h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {ENDPOINTS.map((ep, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50">
+            <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted">
               <span className={cn('text-[10px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded w-12 text-center', METHOD_COLORS[ep.method])}>
                 {ep.method}
               </span>
-              <code className="text-xs font-mono text-slate-900 flex-1">{ep.path}</code>
-              <span className="text-[10px] text-slate-500 truncate">{ep.desc}</span>
-              <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 shrink-0">
+              <code className="text-xs font-mono text-foreground flex-1">{ep.path}</code>
+              <span className="text-[10px] text-muted-foreground truncate">{ep.desc}</span>
+              <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-violet-500/10 text-violet-700 shrink-0 dark:text-violet-300">
                 {ep.scope}
               </span>
             </div>
@@ -160,8 +160,8 @@ function ApiDocs() {
       </div>
 
       {/* Rate limits */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Rate Limits by Plan")}</h2>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t("Rate Limits by Plan")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-2 text-xs">
           {[
             { plan: 'Free', limit: '100/hr', burst: '20' },
@@ -170,21 +170,21 @@ function ApiDocs() {
             { plan: 'Team', limit: '25K/hr', burst: '200' },
             { plan: 'Enterprise', limit: '100K/hr', burst: '500' },
           ].map(t => (
-            <div key={t.plan} className="rounded-md border border-slate-200 p-2 text-center">
-              <p className="font-semibold text-slate-900">{t.plan}</p>
-              <p className="text-sm text-slate-700 mt-0.5">{t.limit}</p>
-              <p className="text-[10px] text-slate-500">burst: {t.burst}</p>
+            <div key={t.plan} className="rounded-md border border-border p-2 text-center">
+              <p className="font-semibold text-foreground">{t.plan}</p>
+              <p className="text-sm text-foreground mt-0.5">{t.limit}</p>
+              <p className="text-[10px] text-muted-foreground">burst: {t.burst}</p>
             </div>
           ))}
         </div>
-        <p className="text-[10px] text-slate-500 mt-2">Rate limits use token bucket algorithm. 429 response includes Retry-After header.</p>
+        <p className="text-[10px] text-muted-foreground mt-2">Rate limits use token bucket algorithm. 429 response includes Retry-After header.</p>
       </div>
 
       {/* Code examples */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-xs font-semibold text-slate-900 mb-2">{t("TypeScript Example")}</h3>
-          <pre className="bg-slate-900 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="text-xs font-semibold text-foreground mb-2">{t("TypeScript Example")}</h3>
+          <pre className="bg-slate-950 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto">
 {`const response = await fetch(
   process.env.PA_BASE_URL + '/api/v1/tenders?market=BD&limit=10',
   { headers: { Authorization: 'Bearer ' + process.env.PA_API_KEY } }
@@ -193,9 +193,9 @@ if (!response.ok) throw new Error(await response.text());
 const tenders = await response.json();`}
           </pre>
         </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-xs font-semibold text-slate-900 mb-2">{t("Python Example")}</h3>
-          <pre className="bg-slate-900 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="text-xs font-semibold text-foreground mb-2">{t("Python Example")}</h3>
+          <pre className="bg-slate-950 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto">
 {`import json, os, urllib.request
 
 request = urllib.request.Request(
@@ -250,29 +250,29 @@ function ApiKeys({ keys, loading, onChanged }: { keys: ApiKeyItem[]; loading: bo
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-500">{keys.length} active API key(s)</p>
-        <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800">
+        <p className="text-xs text-muted-foreground">{keys.length} active API key(s)</p>
+        <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90">
           <Key className="h-3.5 w-3.5" /> {t("New Key")}</button>
       </div>
 
       {loading ? (
-        <div className="p-8 text-center text-sm text-slate-500">{t("Loading...")}</div>
+        <div className="p-8 text-center text-sm text-muted-foreground">{t("Loading...")}</div>
       ) : keys.length === 0 ? (
-        <div className="p-8 text-center text-sm text-slate-500">{t("No API keys. Create one to access the public API.")}</div>
+        <div className="p-8 text-center text-sm text-muted-foreground">{t("No API keys. Create one to access the public API.")}</div>
       ) : (
-        <div className="rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+        <div className="rounded-lg border border-border bg-card divide-y divide-border">
           {keys.map(k => (
             <div key={k.id} className="flex items-center gap-3 px-4 py-3">
-              <Key className="h-4 w-4 text-slate-400 shrink-0" />
+              <Key className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-slate-900">{k.name}</p>
+                <p className="text-sm font-medium text-foreground">{k.name}</p>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <code className="text-[10px] bg-slate-100 px-1 py-0.5 rounded">{k.keyPrefix}...</code>
-                  {k.scopes.map(s => <span key={s} className="text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-700 font-medium">{s}</span>)}
-                  {k.lastUsedAt && <span className="text-[10px] text-slate-500">· Last used {new Date(k.lastUsedAt).toLocaleDateString()}</span>}
+                  <code className="text-[10px] bg-muted px-1 py-0.5 rounded">{k.keyPrefix}...</code>
+                  {k.scopes.map(s => <span key={s} className="text-[9px] px-1 py-0.5 rounded bg-violet-500/10 text-violet-700 font-medium dark:text-violet-300">{s}</span>)}
+                  {k.lastUsedAt && <span className="text-[10px] text-muted-foreground">· Last used {new Date(k.lastUsedAt).toLocaleDateString()}</span>}
                 </div>
               </div>
-              <button onClick={() => revokeKey(k.id)} className="text-slate-400 hover:text-rose-600 text-xs">{t("Revoke")}</button>
+              <button onClick={() => revokeKey(k.id)} className="text-muted-foreground hover:text-rose-600 text-xs dark:hover:text-rose-300">{t("Revoke")}</button>
             </div>
           ))}
         </div>
@@ -283,21 +283,21 @@ function ApiKeys({ keys, loading, onChanged }: { keys: ApiKeyItem[]; loading: bo
       )}
 
       {createdKey && (
-        <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={() => setCreatedKey(null)}>
-          <div className="w-full max-w-md rounded-lg bg-white p-6" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-slate-950/30 z-50 flex items-center justify-center p-4" onClick={() => setCreatedKey(null)}>
+          <div className="w-full max-w-md rounded-lg bg-card p-6" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-              <h2 className="text-sm font-semibold text-slate-900">{t("API Key Created")}</h2>
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
+              <h2 className="text-sm font-semibold text-foreground">{t("API Key Created")}</h2>
             </div>
-            <p className="text-xs text-slate-600 mb-2">{t("Copy this key now — it will not be shown again.")}</p>
+            <p className="text-xs text-muted-foreground mb-2">{t("Copy this key now — it will not be shown again.")}</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-slate-900 text-emerald-400 p-2 rounded font-mono break-all">{createdKey}</code>
-              <button onClick={() => { navigator.clipboard.writeText(createdKey); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs">
-                {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3" />}
+              <code className="flex-1 text-xs bg-slate-950 text-emerald-400 p-2 rounded font-mono break-all">{createdKey}</code>
+              <button onClick={() => { navigator.clipboard.writeText(createdKey); setCopied(true); setTimeout(() => setCopied(false), 2000) }} className="flex items-center gap-1 rounded-md border border-border px-2 py-1.5 text-xs">
+                {copied ? <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-300" /> : <Copy className="h-3 w-3" />}
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <button onClick={() => setCreatedKey(null)} className="mt-3 text-xs text-slate-500 hover:text-slate-900">{t("Dismiss")}</button>
+            <button onClick={() => setCreatedKey(null)} className="mt-3 text-xs text-muted-foreground hover:text-foreground">{t("Dismiss")}</button>
           </div>
         </div>
       )}
@@ -311,28 +311,28 @@ function CreateKeyModal({ onClose, onCreate }: { onClose: () => void; onCreate: 
   const [name, setName] = useState('')
   const [scopes, setScopes] = useState<string[]>(['api:read'])
   return (
-    <div className="fixed inset-0 bg-slate-900/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-lg bg-white p-6" onClick={e => e.stopPropagation()}>
-        <h2 className="text-sm font-semibold text-slate-900 mb-4">{t("Create API Key")}</h2>
+    <div className="fixed inset-0 bg-slate-950/30 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-md rounded-lg bg-card p-6" onClick={e => e.stopPropagation()}>
+        <h2 className="text-sm font-semibold text-foreground mb-4">{t("Create API Key")}</h2>
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Name")}</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Production API key" className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Name")}</label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Production API key" className="w-full text-sm border border-border rounded-md px-3 py-1.5" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Scopes")}</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Scopes")}</label>
             <div className="space-y-1">
               {['api:read', 'api:write', 'mcp:read'].map(s => (
                 <label key={s} className="flex items-center gap-2 text-xs">
                   <input type="checkbox" checked={scopes.includes(s)} onChange={e => e.target.checked ? setScopes([...scopes, s]) : setScopes(scopes.filter(x => x !== s))} />
-                  <code className="text-slate-700">{s}</code>
+                  <code className="text-foreground">{s}</code>
                 </label>
               ))}
             </div>
           </div>
           <div className="flex gap-2 pt-2">
-            <button onClick={() => onCreate(name, scopes)} disabled={!name} className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50">{t("Create")}</button>
-            <button onClick={onClose} className="text-xs text-slate-500 px-3 py-1.5">{t("Cancel")}</button>
+            <button onClick={() => onCreate(name, scopes)} disabled={!name} className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">{t("Create")}</button>
+            <button onClick={onClose} className="text-xs text-muted-foreground px-3 py-1.5">{t("Cancel")}</button>
           </div>
         </div>
       </div>
@@ -400,18 +400,18 @@ function ApiExplorer() {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Interactive API Explorer")}</h2>
-        <p className="text-xs text-slate-500 mb-3">Run a live request using a complete API key. The key stays in memory while this tab is open. Required scope: {selectedEndpoint.scope}.</p>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t("Interactive API Explorer")}</h2>
+        <p className="text-xs text-muted-foreground mb-3">Run a live request using a complete API key. The key stays in memory while this tab is open. Required scope: {selectedEndpoint.scope}.</p>
 
         <div className="space-y-3">
           <div>
-            <label htmlFor="explorer-key" className="block text-xs font-medium text-slate-700 mb-1">{t("Bearer API key")}</label>
-            <input id="explorer-key" type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder={t("Paste your full API key")} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
+            <label htmlFor="explorer-key" className="block text-xs font-medium text-foreground mb-1">{t("Bearer API key")}</label>
+            <input id="explorer-key" type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder={t("Paste your full API key")} className="w-full text-sm border border-border rounded-md px-3 py-1.5" />
             <button className="text-xs underline mt-1" onClick={() => setToken('')}>{t("Clear key")}</button>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Endpoint")}</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Endpoint")}</label>
             <select
               value={`${selectedEndpoint.method} ${selectedEndpoint.path}`}
               onChange={e => {
@@ -423,7 +423,7 @@ function ApiExplorer() {
                   setDownloadUrl(null)
                 }
               }}
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 bg-white"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 bg-card"
             >
               {ENDPOINTS.filter(ep => ep.scope !== 'none').map(ep => (
                 <option key={`${ep.method} ${ep.path}`} value={`${ep.method} ${ep.path}`}>{ep.method} {ep.path} — {ep.desc}</option>
@@ -432,29 +432,29 @@ function ApiExplorer() {
           </div>
 
           {selectedEndpoint.path.includes(':id') && <div>
-            <label htmlFor="explorer-id" className="block text-xs font-medium text-slate-700 mb-1">{t("Entity ID")}</label>
-            <input id="explorer-id" value={entityId} onChange={e => setEntityId(e.target.value)} placeholder={t("Enter an existing entity ID")} className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5" />
+            <label htmlFor="explorer-id" className="block text-xs font-medium text-foreground mb-1">{t("Entity ID")}</label>
+            <input id="explorer-id" value={entityId} onChange={e => setEntityId(e.target.value)} placeholder={t("Enter an existing entity ID")} className="w-full text-sm border border-border rounded-md px-3 py-1.5" />
           </div>}
           {selectedEndpoint.method !== 'GET' && <div>
-            <label htmlFor="explorer-body" className="block text-xs font-medium text-slate-700 mb-1">{t("JSON request body")}</label>
-            <textarea id="explorer-body" value={body} onChange={e => setBody(e.target.value)} rows={5} className="w-full text-sm font-mono border border-slate-200 rounded-md px-3 py-1.5" />
+            <label htmlFor="explorer-body" className="block text-xs font-medium text-foreground mb-1">{t("JSON request body")}</label>
+            <textarea id="explorer-body" value={body} onChange={e => setBody(e.target.value)} rows={5} className="w-full text-sm font-mono border border-border rounded-md px-3 py-1.5" />
           </div>}
 
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">{t("Query Parameters (key=value&key=value)")}</label>
+            <label className="block text-xs font-medium text-foreground mb-1">{t("Query Parameters (key=value&key=value)")}</label>
             <input
               type="text"
               value={params}
               onChange={e => setParams(e.target.value)}
               placeholder="e.g. market=BD&sector=Cyber&limit=5"
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 font-mono"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 font-mono"
             />
           </div>
 
           <button
             onClick={runRequest}
             disabled={loading || !token.trim() || (selectedEndpoint.path.includes(':id') && !entityId.trim())}
-            className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Terminal className="h-3.5 w-3.5" />}
             {loading ? 'Running...' : 'Run Request'}
@@ -463,13 +463,13 @@ function ApiExplorer() {
       </div>
 
       {error && (
-        <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-700">{error}</div>
+        <div className="rounded-md border border-rose-500/30 bg-rose-500/5 p-3 text-xs text-rose-700 dark:text-rose-300">{error}</div>
       )}
 
       {response && (
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-xs font-semibold text-slate-900 mb-2">{t("Response")}</h3>
-          <pre className="bg-slate-900 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto max-h-96 overflow-y-auto">{response}</pre>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h3 className="text-xs font-semibold text-foreground mb-2">{t("Response")}</h3>
+          <pre className="bg-slate-950 text-slate-100 p-3 rounded text-[10px] font-mono overflow-x-auto max-h-96 overflow-y-auto">{response}</pre>
           {downloadUrl && <button className="mt-3 flex items-center gap-1 text-xs underline" onClick={() => download(downloadUrl).catch(cause => setError(cause.message))}><Download className="h-3.5 w-3.5" />{t("Download export")}</button>}
         </div>
       )}
@@ -498,29 +498,29 @@ function UsageStats() {
       .catch(cause => { setError(cause.message); setLoading(false) })
   }
   useEffect(() => { load() }, [])
-  if (loading) return <div className="p-8 text-center text-sm text-slate-500">{t("Loading usage stats...")}</div>
-  if (!stats) return <div role="alert" className="p-8 text-sm text-rose-700">{error ?? 'Unable to load usage.'} <button className="underline" onClick={load}>{t("Retry")}</button></div>
+  if (loading) return <div className="p-8 text-center text-sm text-muted-foreground">{t("Loading usage stats...")}</div>
+  if (!stats) return <div role="alert" className="p-8 text-sm text-rose-700 dark:text-rose-300">{error ?? 'Unable to load usage.'} <button className="underline" onClick={load}>{t("Retry")}</button></div>
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900">{t("Current Period Usage")}</h2>
-        <p className="mt-1 text-xs text-slate-500">Plan: {stats.subscription.plan} · {formatDate(stats.subscription.currentPeriodStart)} to {formatDate(stats.subscription.currentPeriodEnd)}</p>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground">{t("Current Period Usage")}</h2>
+        <p className="mt-1 text-xs text-muted-foreground">Plan: {stats.subscription.plan} · {formatDate(stats.subscription.currentPeriodStart)} to {formatDate(stats.subscription.currentPeriodEnd)}</p>
       </div>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
         {stats.usage.map(metric => (
-          <div key={metric.metricType} className="rounded-lg border border-slate-200 bg-white p-3">
-            <p className="text-xs font-medium capitalize text-slate-500">{metric.metricType.replace(/_/g, ' ')}</p>
-            <p className="text-xl font-semibold text-slate-900">{metric.used.toLocaleString()}</p>
-            <p className="text-xs text-slate-500">{metric.limit.toLocaleString()} included · {metric.percentage}% used</p>
+          <div key={metric.metricType} className="rounded-lg border border-border bg-card p-3">
+            <p className="text-xs font-medium capitalize text-muted-foreground">{metric.metricType.replace(/_/g, ' ')}</p>
+            <p className="text-xl font-semibold text-foreground">{metric.used.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">{metric.limit.toLocaleString()} included · {metric.percentage}% used</p>
           </div>
         ))}
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-medium text-slate-500">{t("Provider Calls")}</p>
-          <p className="text-xl font-semibold text-slate-900">{typeof stats.providerCalls === 'number' ? stats.providerCalls.toLocaleString() : 'Unavailable'}</p>
-          <p className="text-xs text-slate-500">{t("Recorded during this billing period")}</p>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <p className="text-xs font-medium text-muted-foreground">{t("Provider Calls")}</p>
+          <p className="text-xl font-semibold text-foreground">{typeof stats.providerCalls === 'number' ? stats.providerCalls.toLocaleString() : 'Unavailable'}</p>
+          <p className="text-xs text-muted-foreground">{t("Recorded during this billing period")}</p>
         </div>
       </div>
-      <p className="text-xs text-slate-500">Daily history, endpoint rankings, and live API key rate limits are unavailable in this usage summary.</p>
+      <p className="text-xs text-muted-foreground">Daily history, endpoint rankings, and live API key rate limits are unavailable in this usage summary.</p>
     </div>
   )
 }

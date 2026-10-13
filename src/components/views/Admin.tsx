@@ -121,10 +121,10 @@ export function Admin() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-          <Shield className="h-6 w-6 text-slate-700" />
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+          <Shield className="h-6 w-6 text-foreground" />
           {t("Admin Console")}</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Tenant management, user administration, and system health monitoring.
         </p>
       </div>
@@ -132,7 +132,7 @@ export function Admin() {
       {tab === 'users' && <InviteUser onCreated={loadUsers} />}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200">
+      <div className="flex items-center gap-1 border-b border-border">
         {[
           { id: 'users', label: 'User Management', icon: Users },
           { id: 'system', label: 'System Health', icon: Activity },
@@ -144,7 +144,7 @@ export function Admin() {
               onClick={() => setTab(t.id as 'users' | 'system')}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
-                tab === t.id ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-500 hover:text-slate-900'
+                tab === t.id ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -155,64 +155,64 @@ export function Admin() {
       </div>
 
       {tab === 'users' && (
-        <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           {loading ? (
-            <div className="p-8 text-center text-sm text-slate-500">{t("Loading users...")}</div>
+            <div className="p-8 text-center text-sm text-muted-foreground">{t("Loading users...")}</div>
           ) : users.length === 0 ? (
             <div className="p-8 text-center">
-              <Shield className="h-8 w-8 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500">Manager+ role required to view users. Sign in as owner@atlas-demo.com.</p>
+              <Shield className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Manager+ role required to view users. Sign in as owner@atlas-demo.com.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("User")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Role")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">MFA</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Last Login")}</th>
-                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
+                  <tr className="border-b border-border bg-muted text-left">
+                    <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("User")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Role")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">MFA</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Last Login")}</th>
+                    <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Status")}</th>
                     <th className="px-2 py-2"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-border">
                   {users.map((u) => (
-                    <tr key={u.id} className="hover:bg-slate-50">
+                    <tr key={u.id} className="hover:bg-muted">
                       <td className="px-4 py-3">
-                        <p className="text-sm font-medium text-slate-900">{u.name ?? u.email}</p>
-                        <p className="text-xs text-slate-500">{u.email}</p>
+                        <p className="text-sm font-medium text-foreground">{u.name ?? u.email}</p>
+                        <p className="text-xs text-muted-foreground">{u.email}</p>
                       </td>
                       <td className="px-3 py-3">
                         <span className={cn(
                           'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-                          u.role === 'owner' ? 'bg-violet-500/15 text-violet-700' :
-                          u.role === 'admin' ? 'bg-rose-500/15 text-rose-700' :
-                          u.role === 'manager' ? 'bg-amber-500/15 text-amber-700' :
-                          u.role === 'contributor' ? 'bg-sky-500/15 text-sky-700' :
-                          'bg-slate-500/15 text-slate-600'
+                          u.role === 'owner' ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300' :
+                          u.role === 'admin' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+                          u.role === 'manager' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                          u.role === 'contributor' ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300' :
+                          'bg-slate-500/15 text-muted-foreground'
                         )}>
                           {u.role}
                         </span>
                       </td>
                       <td className="px-3 py-3">
                         {u.mfaEnabled ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                         ) : (
-                          <span className="text-xs text-slate-400">off</span>
+                          <span className="text-xs text-muted-foreground">off</span>
                         )}
                       </td>
-                      <td className="px-3 py-3 text-xs text-slate-600">
+                      <td className="px-3 py-3 text-xs text-muted-foreground">
                         {u.lastLoginAt ? formatDateTime(u.lastLoginAt) : 'never'}
-                        {u.lastLoginIp && <p className="text-[10px] text-slate-400">{u.lastLoginIp}</p>}
+                        {u.lastLoginIp && <p className="text-[10px] text-muted-foreground">{u.lastLoginIp}</p>}
                       </td>
                       <td className="px-3 py-3">
                         {u.isLocked ? (
-                          <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 flex items-center gap-1 w-fit">
+                          <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 flex items-center gap-1 w-fit dark:text-rose-300">
                             <Lock className="h-3 w-3" /> locked
                           </span>
                         ) : (
-                          <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 flex items-center gap-1 w-fit">
+                          <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 flex items-center gap-1 w-fit dark:text-emerald-300">
                             <Unlock className="h-3 w-3" /> active
                           </span>
                         )}
@@ -223,7 +223,7 @@ export function Admin() {
                             <button
                               onClick={() => unlockUser(u.id)}
                               disabled={actionLoading === u.id}
-                              className="text-slate-400 hover:text-emerald-600 p-1"
+                              className="text-muted-foreground hover:text-emerald-600 p-1 dark:hover:text-emerald-300"
                               title={t("Unlock account")}
                             >
                               {actionLoading === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
@@ -233,7 +233,7 @@ export function Admin() {
                             <button
                               onClick={() => deleteUser(u.id)}
                               disabled={actionLoading === u.id}
-                              className="text-slate-400 hover:text-rose-600 p-1"
+                              className="text-muted-foreground hover:text-rose-600 p-1 dark:hover:text-rose-300"
                               title={t("Deactivate user")}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -261,35 +261,35 @@ export function Admin() {
           </div>
 
           {/* LLM usage */}
-          <div className="rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
-              <Cpu className="h-4 w-4 text-violet-600" />
+          <div className="rounded-lg border border-border bg-card p-4">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+              <Cpu className="h-4 w-4 text-violet-600 dark:text-violet-300" />
               {t("LLM Usage (Last 30 Days)")}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("API Calls")}</p>
-                <p className="text-lg font-semibold text-slate-900">{system.llmUsage.callsLast30Days}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("API Calls")}</p>
+                <p className="text-lg font-semibold text-foreground">{system.llmUsage.callsLast30Days}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Input Tokens")}</p>
-                <p className="text-lg font-semibold text-slate-900">{system.llmUsage.inputTokens.toLocaleString()}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Input Tokens")}</p>
+                <p className="text-lg font-semibold text-foreground">{system.llmUsage.inputTokens.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Output Tokens")}</p>
-                <p className="text-lg font-semibold text-slate-900">{system.llmUsage.outputTokens.toLocaleString()}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Output Tokens")}</p>
+                <p className="text-lg font-semibold text-foreground">{system.llmUsage.outputTokens.toLocaleString()}</p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Cost (USD)")}</p>
-                <p className="text-lg font-semibold text-slate-900">${system.llmUsage.costUsd.toFixed(4)}</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Cost (USD)")}</p>
+                <p className="text-lg font-semibold text-foreground">${system.llmUsage.costUsd.toFixed(4)}</p>
               </div>
             </div>
           </div>
 
           {/* Storage + counts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
-                <HardDrive className="h-4 w-4 text-sky-600" />
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                <HardDrive className="h-4 w-4 text-sky-600 dark:text-sky-300" />
                 {t("Storage & Data")}</h2>
               <div className="space-y-2 text-sm">
                 <Row label={t("File uploads")} value={system.stats.fileUploads.toString()} />
@@ -300,19 +300,19 @@ export function Admin() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-white p-4">
-              <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
-                <Activity className="h-4 w-4 text-emerald-600" />
+            <div className="rounded-lg border border-border bg-card p-4">
+              <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                <Activity className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
                 {t("Recent Connector Runs")}</h2>
               <div className="space-y-2">
                 {system.recentConnectorRuns.map((r) => (
                   <div key={r.id} className="flex items-center gap-2 text-xs">
-                    {r.status === 'success' ? <CheckCircle2 className="h-3 w-3 text-emerald-600" /> :
-                     r.status === 'partial' ? <AlertCircle className="h-3 w-3 text-amber-600" /> :
-                     <AlertCircle className="h-3 w-3 text-rose-600" />}
-                    <span className="font-medium text-slate-700">{r.sourceCode}</span>
-                    <span className="text-slate-500">{r.itemsFetched} fetched, {r.itemsCreated} created</span>
-                    <span className="text-slate-400 ml-auto">{formatDate(r.startedAt)}</span>
+                    {r.status === 'success' ? <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-300" /> :
+                     r.status === 'partial' ? <AlertCircle className="h-3 w-3 text-amber-600 dark:text-amber-300" /> :
+                     <AlertCircle className="h-3 w-3 text-rose-600 dark:text-rose-300" />}
+                    <span className="font-medium text-foreground">{r.sourceCode}</span>
+                    <span className="text-muted-foreground">{r.itemsFetched} fetched, {r.itemsCreated} created</span>
+                    <span className="text-muted-foreground ml-auto">{formatDate(r.startedAt)}</span>
                   </div>
                 ))}
               </div>
@@ -331,20 +331,20 @@ function StatTile({ icon: Icon, label, value, tone }: {
   tone: 'sky' | 'violet' | 'rose' | 'amber'
 }) {
   const toneMap: Record<string, string> = {
-    sky: 'text-sky-600 bg-sky-500/10',
-    violet: 'text-violet-600 bg-violet-500/10',
-    rose: 'text-rose-600 bg-rose-500/10',
-    amber: 'text-amber-600 bg-amber-500/10',
+    sky: 'text-sky-600 bg-sky-500/10 dark:text-sky-300',
+    violet: 'text-violet-600 bg-violet-500/10 dark:text-violet-300',
+    rose: 'text-rose-600 bg-rose-500/10 dark:text-rose-300',
+    amber: 'text-amber-600 bg-amber-500/10 dark:text-amber-300',
   }
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
         <div className={cn('rounded-md p-1', toneMap[tone])}>
           <Icon className="h-3 w-3" />
         </div>
       </div>
-      <p className="text-xl font-semibold text-slate-900">{value}</p>
+      <p className="text-xl font-semibold text-foreground">{value}</p>
     </div>
   )
 }
@@ -352,8 +352,8 @@ function StatTile({ icon: Icon, label, value, tone }: {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-slate-500">{label}</span>
-      <span className="font-medium text-slate-900">{value}</span>
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   )
 }

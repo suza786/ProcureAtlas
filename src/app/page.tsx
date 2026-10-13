@@ -40,7 +40,7 @@ const Markets = dynamic(() => import('@/components/views/Markets').then(m => m.M
 
 function ViewLoading() {
   const { t } = useTranslation()
-  return <div role="status" className="space-y-3 p-4"><span className="sr-only">{t('shell.loadingModule')}</span><div className="h-8 w-48 animate-pulse rounded bg-slate-200" /><div className="h-48 animate-pulse rounded bg-slate-100" /></div>
+  return <div role="status" className="space-y-3 p-4"><span className="sr-only">{t('shell.loadingModule')}</span><div className="h-8 w-48 animate-pulse rounded bg-accent" /><div className="h-48 animate-pulse rounded bg-muted" /></div>
 }
 
 export default function Home() {
@@ -78,8 +78,8 @@ export default function Home() {
   }
 
   return (
-    <div className="flex h-screen bg-slate-50 text-slate-900">
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-white focus:p-3">{t('shell.skipContent')}</a>
+    <div className="flex h-screen bg-muted dark:bg-background text-foreground">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:z-50 focus:bg-card focus:p-3">{t('shell.skipContent')}</a>
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />

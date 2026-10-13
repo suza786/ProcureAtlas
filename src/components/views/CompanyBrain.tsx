@@ -129,8 +129,8 @@ export function CompanyBrain() {
       .catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading Company Brain...")}</div>
-  if (!data) return <div className="p-6 text-sm text-rose-600">{t("Company profile not found.")}</div>
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">{t("Loading Company Brain...")}</div>
+  if (!data) return <div className="p-6 text-sm text-rose-600 dark:text-rose-300">{t("Company profile not found.")}</div>
 
   return (
     <div className="space-y-6">
@@ -138,15 +138,15 @@ export function CompanyBrain() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <Brain className="h-5 w-5 text-slate-700" />
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{data.name}</h1>
+            <Brain className="h-5 w-5 text-foreground" />
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{data.name}</h1>
           </div>
-          <p className="text-sm text-slate-500 mt-1">{data.legalName} · {data.country}</p>
+          <p className="text-sm text-muted-foreground mt-1">{data.legalName} · {data.country}</p>
         </div>
         {data.expiryBuckets.expired + data.expiryBuckets.thirtyDays > 0 && (
           <div className="flex items-center gap-2 rounded-md border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs">
-            <AlertTriangle className="h-4 w-4 text-rose-600" />
-            <span className="text-rose-700 font-medium">
+            <AlertTriangle className="h-4 w-4 text-rose-600 dark:text-rose-300" />
+            <span className="text-rose-700 font-medium dark:text-rose-300">
               {data.expiryBuckets.expired + data.expiryBuckets.thirtyDays} certification(s) need attention
             </span>
           </div>
@@ -165,13 +165,13 @@ export function CompanyBrain() {
       <CapabilityEditor companyId={data.id} evidence={data.evidence} />
 
       {/* Company metadata */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Company Profile")}</h2>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t("Company Profile")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
           <Field icon={Building2} label={t("Registration No.")} value={data.registrationNo} />
           <Field icon={FileCheck2} label={t("Tax ID")} value={data.taxId} />
           <Field icon={Globe} label={t("Website")} value={data.website ? (
-            <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:text-sky-900 flex items-center gap-1">
+            <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-sky-700 hover:text-sky-900 flex items-center gap-1 dark:text-sky-300 dark:hover:text-sky-300">
               {data.website} <ExternalLink className="h-3 w-3" />
             </a>
           ) : '—'} />
@@ -182,22 +182,22 @@ export function CompanyBrain() {
           <Field icon={TrendingUp} label={t("Annual Turnover")} value={formatUSD(data.annualTurnoverUSD)} />
         </div>
         {data.description && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs text-slate-600 leading-relaxed">{data.description}</p>
+          <div className="mt-4 pt-4 border-t border-border">
+            <p className="text-xs text-muted-foreground leading-relaxed">{data.description}</p>
           </div>
         )}
       </div>
 
       {/* Capability map */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Capability Map")}</h2>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t("Capability Map")}</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {Object.entries(data.capabilityMap).map(([cat, count]) => (
-            <div key={cat} className="rounded-md border border-slate-200 p-2.5">
-              <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{EVIDENCE_CATEGORY_LABEL[cat] ?? cat}</p>
-              <p className="text-lg font-semibold text-slate-900 mt-0.5">{count}</p>
-              <div className="w-full bg-slate-100 rounded-full h-1 mt-1.5">
-                <div className="bg-slate-900 h-full rounded-full" style={{ width: `${Math.min(count * 20, 100)}%` }} />
+            <div key={cat} className="rounded-md border border-border p-2.5">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{EVIDENCE_CATEGORY_LABEL[cat] ?? cat}</p>
+              <p className="text-lg font-semibold text-foreground mt-0.5">{count}</p>
+              <div className="w-full bg-muted rounded-full h-1 mt-1.5">
+                <div className="bg-primary h-full rounded-full" style={{ width: `${Math.min(count * 20, 100)}%` }} />
               </div>
             </div>
           ))}
@@ -207,14 +207,14 @@ export function CompanyBrain() {
       {/* Two-column: certifications + projects */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Certifications with expiry */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <Award className="h-4 w-4 text-violet-600" />
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <Award className="h-4 w-4 text-violet-600 dark:text-violet-300" />
               {t("Certifications")}</h2>
             <ExpiryBuckets buckets={data.expiryBuckets} />
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.certifications.map(c => {
               const expired = c.daysToExpiry !== null && c.daysToExpiry < 0
               const soon = c.daysToExpiry !== null && c.daysToExpiry >= 0 && c.daysToExpiry <= 30
@@ -223,29 +223,29 @@ export function CompanyBrain() {
                 <div key={c.id} className="px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-sm font-medium text-foreground">{c.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {c.issuer ?? 'Unknown issuer'}
                         {c.certificateNo && ` · #${c.certificateNo}`}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
                         {t("Issued:")}{formatDate(c.issuedAt)}
                         {c.expiresAt && ` · Expires: ${formatDate(c.expiresAt)}`}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       {c.verified && (
-                        <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700">
+                        <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
                           verified
                         </span>
                       )}
                       {c.daysToExpiry !== null && (
                         <span className={cn(
                           'text-[10px] font-medium px-1.5 py-0.5 rounded',
-                          expired ? 'bg-rose-500/15 text-rose-700' :
-                          soon ? 'bg-rose-500/15 text-rose-700' :
-                          approaching ? 'bg-amber-500/15 text-amber-700' :
-                          'bg-emerald-500/15 text-emerald-700'
+                          expired ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+                          soon ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+                          approaching ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                          'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
                         )}>
                           {expired ? `${Math.abs(c.daysToExpiry)}d overdue` : `${c.daysToExpiry}d left`}
                         </span>
@@ -259,25 +259,25 @@ export function CompanyBrain() {
         </div>
 
         {/* Project references */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <FolderKanban className="h-4 w-4 text-sky-600" />
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <FolderKanban className="h-4 w-4 text-sky-600 dark:text-sky-300" />
               {t("Project References")}</h2>
-            <span className="text-xs text-slate-500">{data.projectReferences.length} on file</span>
+            <span className="text-xs text-muted-foreground">{data.projectReferences.length} on file</span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.projectReferences.map(p => (
               <div key={p.id} className="px-4 py-3">
-                <p className="text-sm font-medium text-slate-900">{p.title}</p>
-                <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
-                  <span><strong className="text-slate-700">{p.client}</strong></span>
+                <p className="text-sm font-medium text-foreground">{p.title}</p>
+                <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground flex-wrap">
+                  <span><strong className="text-foreground">{p.client}</strong></span>
                   {p.clientType && (
                     <span className={cn(
                       'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-                      p.clientType === 'government' ? 'bg-sky-500/15 text-sky-700' :
-                      p.clientType === 'multilateral' ? 'bg-violet-500/15 text-violet-700' :
-                      'bg-slate-500/15 text-slate-700'
+                      p.clientType === 'government' ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300' :
+                      p.clientType === 'multilateral' ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300' :
+                      'bg-slate-500/15 text-foreground'
                     )}>
                       {p.clientType}
                     </span>
@@ -285,10 +285,10 @@ export function CompanyBrain() {
                   {p.country && <span>· {p.country}</span>}
                   {p.role && <span>· {p.role}</span>}
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                   {p.startDate && <span>{formatDate(p.startDate)} → {formatDate(p.endDate)}</span>}
                   {p.valueUSD !== null && <span>· {formatUSD(p.valueUSD)}</span>}
-                  {p.verified && <span className="text-emerald-600 font-medium">· verified</span>}
+                  {p.verified && <span className="text-emerald-600 font-medium dark:text-emerald-300">· verified</span>}
                 </div>
               </div>
             ))}
@@ -297,54 +297,54 @@ export function CompanyBrain() {
       </div>
 
       {/* Evidence list */}
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+      <div className="rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <FileCheck2 className="h-4 w-4 text-emerald-600" />
+            <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+              <FileCheck2 className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
               {t("Evidence Library")}</h2>
-            <p className="text-xs text-slate-500 mt-0.5">{t("Every factual company claim is linked to verifiable evidence.")}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{t("Every factual company claim is linked to verifiable evidence.")}</p>
           </div>
           <button
             onClick={() => setShowUpload(true)}
-            className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="h-3.5 w-3.5" /> {t("Add Evidence")}</button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-left">
-                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Title")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Category")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Issuer")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Issued")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Expires")}</th>
-                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">{t("Status")}</th>
+              <tr className="border-b border-border bg-muted text-left">
+                <th className="px-4 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Title")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Category")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Issuer")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Issued")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Expires")}</th>
+                <th className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{t("Status")}</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {data.evidence.map(e => {
                 const expired = e.expiresAt && daysUntil(e.expiresAt) !== null && daysUntil(e.expiresAt)! < 0
                 return (
-                  <tr key={e.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-2.5 text-sm font-medium text-slate-900">{e.title}</td>
+                  <tr key={e.id} className="hover:bg-muted">
+                    <td className="px-4 py-2.5 text-sm font-medium text-foreground">{e.title}</td>
                     <td className="px-3 py-2.5">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         {EVIDENCE_CATEGORY_LABEL[e.category] ?? e.category}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-slate-600">{e.issuer ?? '—'}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(e.issuedAt)}</td>
-                    <td className="px-3 py-2.5 text-xs text-slate-500">{formatDate(e.expiresAt)}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{e.issuer ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{formatDate(e.issuedAt)}</td>
+                    <td className="px-3 py-2.5 text-xs text-muted-foreground">{formatDate(e.expiresAt)}</td>
                     <td className="px-3 py-2.5">
                       {e.verified ? (
-                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700">verified</span>
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">verified</span>
                       ) : (
-                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700">pending</span>
+                        <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">pending</span>
                       )}
                       {expired && (
-                        <span className="ml-1 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">expired</span>
+                        <span className="ml-1 text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">expired</span>
                       )}
                     </td>
                   </tr>
@@ -356,30 +356,30 @@ export function CompanyBrain() {
       </div>
 
       {/* Employees */}
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Users className="h-4 w-4 text-amber-600" />
+      <div className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground flex items-center gap-2">
+            <Users className="h-4 w-4 text-amber-600 dark:text-amber-300" />
             {t("Key Personnel")}</h2>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
           {data.employees.map(emp => (
-            <div key={emp.id} className="rounded-md border border-slate-200 p-3">
+            <div key={emp.id} className="rounded-md border border-border p-3">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-semibold text-slate-700">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
                   {emp.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{emp.name}</p>
-                  <p className="text-xs text-slate-500">{emp.role}</p>
+                  <p className="text-sm font-medium text-foreground">{emp.name}</p>
+                  <p className="text-xs text-muted-foreground">{emp.role}</p>
                 </div>
               </div>
               {emp.qualifications && (
-                <p className="text-xs text-slate-600 mt-2">
-                  <span className="text-slate-400">{t("Qualifications:")}</span> {emp.qualifications}
+                <p className="text-xs text-muted-foreground mt-2">
+                  <span className="text-muted-foreground">{t("Qualifications:")}</span> {emp.qualifications}
                 </p>
               )}
-              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-slate-400">
+              <div className="flex items-center gap-3 mt-1.5 text-[10px] text-muted-foreground">
                 {emp.yearsExperience && <span>{emp.yearsExperience}y exp</span>}
                 {emp.securityClearance && <span>· {emp.securityClearance}</span>}
               </div>
@@ -498,24 +498,24 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
     <WorkflowDialog title={t("Add Evidence")} description="Upload a document and link it to your company evidence." onClose={onClose} busy={uploading}>
         <div className="space-y-3">
           <div>
-            <label htmlFor="evidence-title" className="block text-xs font-medium text-slate-700 mb-1">{t("Title *")}</label>
+            <label htmlFor="evidence-title" className="block text-xs font-medium text-foreground mb-1">{t("Title *")}</label>
             <input
               id="evidence-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. ISO 27001:2022 Certification"
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
             />
           </div>
 
           <div>
-            <label htmlFor="evidence-category" className="block text-xs font-medium text-slate-700 mb-1">{t("Category")}</label>
+            <label htmlFor="evidence-category" className="block text-xs font-medium text-foreground mb-1">{t("Category")}</label>
             <select
               id="evidence-category"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400 bg-white"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400 bg-card"
             >
               {Object.entries(EVIDENCE_CATEGORY_LABEL).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -524,30 +524,30 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
           </div>
 
           <div>
-            <label htmlFor="evidence-issuer" className="block text-xs font-medium text-slate-700 mb-1">{t("Issuer")}</label>
+            <label htmlFor="evidence-issuer" className="block text-xs font-medium text-foreground mb-1">{t("Issuer")}</label>
             <input
               id="evidence-issuer"
               type="text"
               value={issuer}
               onChange={(e) => setIssuer(e.target.value)}
               placeholder="e.g. BSI, Microsoft, RJSC"
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
             />
           </div>
 
           <div>
-            <label htmlFor="evidence-expiry" className="block text-xs font-medium text-slate-700 mb-1">{t("Expires (optional)")}</label>
+            <label htmlFor="evidence-expiry" className="block text-xs font-medium text-foreground mb-1">{t("Expires (optional)")}</label>
             <input
               id="evidence-expiry"
               type="date"
               value={expiresAt}
               onChange={(e) => setExpiresAt(e.target.value)}
-              className="w-full text-sm border border-slate-200 rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
+              className="w-full text-sm border border-border rounded-md px-3 py-1.5 outline-none focus:border-slate-400"
             />
           </div>
 
           <div>
-            <label htmlFor="evidence-file" className="block text-xs font-medium text-slate-700 mb-1">File * (PDF, PNG, JPG, TXT, DOCX, XLSX — max 25 MB)</label>
+            <label htmlFor="evidence-file" className="block text-xs font-medium text-foreground mb-1">File * (PDF, PNG, JPG, TXT, DOCX, XLSX — max 25 MB)</label>
             <div className="flex items-center gap-2">
               <input
                 id="evidence-file"
@@ -555,28 +555,28 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
                 disabled={!!uploadedFile}
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
                 accept=".pdf,.png,.jpg,.jpeg,.txt,.docx,.xlsx"
-                className="text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-900 file:text-white file:px-3 file:py-1.5 file:text-xs file:font-medium file:cursor-pointer"
+                className="text-xs file:mr-2 file:rounded file:border-0 file:bg-primary file:text-primary-foreground file:px-3 file:py-1.5 file:text-xs file:font-medium file:cursor-pointer"
               />
             </div>
             {file && (
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 {file.name} — {(file.size / 1024).toFixed(0)} KB
               </p>
             )}
           </div>
 
           {error && (
-            <div role="alert" className="text-xs text-rose-700 bg-rose-500/5 border border-rose-500/30 rounded-md p-2">
+            <div role="alert" className="text-xs text-rose-700 bg-rose-500/5 border border-rose-500/30 rounded-md p-2 dark:text-rose-300">
               {error}
             </div>
           )}
           {success && (
-            <div role="status" className="text-xs text-emerald-700 bg-emerald-500/5 border border-emerald-500/30 rounded-md p-2 flex items-center gap-1.5">
+            <div role="status" className="text-xs text-emerald-700 bg-emerald-500/5 border border-emerald-500/30 rounded-md p-2 flex items-center gap-1.5 dark:text-emerald-300">
               <CheckCircle2 className="h-3.5 w-3.5" /> {success}
             </div>
           )}
           {scanStatus && uploadedFile && (
-            <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-700" role="status" aria-live="polite">
+            <div className="rounded-md border border-border bg-muted p-3 text-xs text-foreground" role="status" aria-live="polite">
               <p>{scanStatus.message}</p>
               {pollPaused && scanStatus.poll && <div className="mt-2"><p>{t("Automatic checks paused. Your file remains quarantined.")}</p><button type="button" className="mt-1 underline" onClick={() => { setPollPaused(false); setPollGeneration(value => value + 1) }}>{t("Check processing status again")}</button></div>}
               {scanStatus.downloadable && (
@@ -590,7 +590,7 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
             <button
               onClick={submit}
               disabled={uploading || !!success || !file || !title}
-              className="flex items-center gap-1.5 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
               {uploading ? t("Uploading...") : t("Upload")}
@@ -598,7 +598,7 @@ function UploadModal({ onClose, onUploaded }: { onClose: () => void; onUploaded:
             <button
               disabled={uploading}
               onClick={success ? onUploaded : onClose}
-              className="text-xs text-slate-500 hover:text-slate-900 px-3 py-1.5"
+              className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5"
             >{success ? t("Done") : t("Cancel")}</button>
           </div>
         </div>
@@ -614,23 +614,23 @@ function StatTile({ icon: Icon, label, value, sub, tone }: {
   tone: 'emerald' | 'sky' | 'violet' | 'rose' | 'amber' | 'slate'
 }) {
   const toneMap: Record<string, string> = {
-    emerald: 'text-emerald-600 bg-emerald-500/10',
-    sky: 'text-sky-600 bg-sky-500/10',
-    violet: 'text-violet-600 bg-violet-500/10',
-    rose: 'text-rose-600 bg-rose-500/10',
-    amber: 'text-amber-600 bg-amber-500/10',
-    slate: 'text-slate-600 bg-slate-500/10',
+    emerald: 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-300',
+    sky: 'text-sky-600 bg-sky-500/10 dark:text-sky-300',
+    violet: 'text-violet-600 bg-violet-500/10 dark:text-violet-300',
+    rose: 'text-rose-600 bg-rose-500/10 dark:text-rose-300',
+    amber: 'text-amber-600 bg-amber-500/10 dark:text-amber-300',
+    slate: 'text-muted-foreground bg-slate-500/10',
   }
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-border bg-card p-3">
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
         <div className={cn('rounded-md p-1', toneMap[tone])}>
           <Icon className="h-3 w-3" />
         </div>
       </div>
-      <p className="text-xl font-semibold text-slate-900">{value}</p>
-      {sub && <p className="text-[10px] text-slate-500 mt-0.5">{sub}</p>}
+      <p className="text-xl font-semibold text-foreground">{value}</p>
+      {sub && <p className="text-[10px] text-muted-foreground mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -639,16 +639,16 @@ function ExpiryBuckets({ buckets }: { buckets: { expired: number; thirtyDays: nu
   return (
     <div className="flex items-center gap-2 text-[10px]">
       {buckets.expired > 0 && (
-        <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 font-medium">{buckets.expired} expired</span>
+        <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 font-medium dark:text-rose-300">{buckets.expired} expired</span>
       )}
       {buckets.thirtyDays > 0 && (
-        <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 font-medium">{buckets.thirtyDays} ≤30d</span>
+        <span className="px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 font-medium dark:text-rose-300">{buckets.thirtyDays} ≤30d</span>
       )}
       {buckets.ninetyDays > 0 && (
-        <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-medium">{buckets.ninetyDays} ≤90d</span>
+        <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-medium dark:text-amber-300">{buckets.ninetyDays} ≤90d</span>
       )}
       {buckets.safe > 0 && (
-        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-medium">{buckets.safe} safe</span>
+        <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-medium dark:text-emerald-300">{buckets.safe} safe</span>
       )}
     </div>
   )
@@ -657,10 +657,10 @@ function ExpiryBuckets({ buckets }: { buckets: { expired: number; thirtyDays: nu
 function Field({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2">
-      <Icon className="h-3.5 w-3.5 text-slate-400 mt-0.5 shrink-0" />
+      <Icon className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
-        <p className="text-sm text-slate-900 mt-0.5 break-words">{value}</p>
+        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
+        <p className="text-sm text-foreground mt-0.5 break-words">{value}</p>
       </div>
     </div>
   )

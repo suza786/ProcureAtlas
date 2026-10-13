@@ -108,7 +108,7 @@ export function CommandCenter() {
   if (loading) return <CommandCenterSkeleton />
   if (error || !data) {
     return (
-      <div className="p-6 text-sm text-rose-700">
+      <div className="p-6 text-sm text-rose-700 dark:text-rose-300">
         {t("Failed to load dashboard:")}{error}
       </div>
     )
@@ -132,8 +132,8 @@ export function CommandCenter() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{t("Command Center")}</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t("Command Center")}</h1>
+        <p className="text-sm text-muted-foreground">
           {data.tenant.name} · {data.tenant.plan} plan · {data.company?.name ?? 'No company profile'}
         </p>
       </div>
@@ -196,16 +196,16 @@ export function CommandCenter() {
       {/* Main grid: deadlines + alerts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Deadlines this week */}
-        <div className="lg:col-span-2 rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("Deadlines — Next 7 Days")}</h2>
-            <button onClick={goDiscover} className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1">
+        <div className="lg:col-span-2 rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">{t("Deadlines — Next 7 Days")}</h2>
+            <button onClick={goDiscover} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
               {t("View all")}<ArrowRight className="h-3 w-3" />
             </button>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.deadlinesThisWeek.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
                 {t("No deadlines in the next 7 days.")}</div>
             ) : (
               data.deadlinesThisWeek.map((d) => {
@@ -214,29 +214,29 @@ export function CommandCenter() {
                   <button
                     key={d.id}
                     onClick={() => openTender(d.id)}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors"
                   >
                     <div className={cn(
                       'flex h-10 w-12 flex-col items-center justify-center rounded-md text-xs font-semibold',
                       urgency === 'critical' ? 'bg-rose-500 text-white' :
                       urgency === 'high' ? 'bg-amber-500 text-white' :
-                      'bg-slate-100 text-slate-700'
+                      'bg-muted text-foreground'
                     )}>
                       <span className="text-base leading-none">{d.days}</span>
                       <span className="text-[9px] uppercase tracking-wider opacity-80">{t("days")}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">{d.title}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{d.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', marketColor(d.market))}>
                           {marketLabel(d.market)}
                         </span>
-                        <span className="text-xs text-slate-500">{formatUSD(d.valueUSD)}</span>
-                        <span className="text-xs text-slate-400">·</span>
-                        <span className="text-xs text-slate-500">{formatDateTime(d.submissionDeadline)}</span>
+                        <span className="text-xs text-muted-foreground">{formatUSD(d.valueUSD)}</span>
+                        <span className="text-xs text-muted-foreground">·</span>
+                        <span className="text-xs text-muted-foreground">{formatDateTime(d.submissionDeadline)}</span>
                       </div>
                     </div>
-                    <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
+                    <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                   </button>
                 )
               })
@@ -245,14 +245,14 @@ export function CommandCenter() {
         </div>
 
         {/* Active alerts */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("Active Alerts")}</h2>
-            <span className="text-xs text-slate-500">{data.alerts.length}</span>
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">{t("Active Alerts")}</h2>
+            <span className="text-xs text-muted-foreground">{data.alerts.length}</span>
           </div>
-          <div className="divide-y divide-slate-100 max-h-[28rem] overflow-y-auto">
+          <div className="divide-y divide-border max-h-[28rem] overflow-y-auto">
             {data.alerts.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No active alerts.")}</div>
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("No active alerts.")}</div>
             ) : (
               data.alerts.map((a) => (
                 <div key={a.id} className="px-4 py-3">
@@ -261,10 +261,10 @@ export function CommandCenter() {
                       {a.severity}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-900">{a.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{a.message}</p>
+                      <p className="text-xs font-semibold text-foreground">{a.title}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{a.message}</p>
                       {a.dueAt && (
-                        <p className="text-[10px] text-slate-400 mt-1">
+                        <p className="text-[10px] text-muted-foreground mt-1">
                           {t("Due")}{formatDateTime(a.dueAt)} ({daysUntil(a.dueAt)}d)
                         </p>
                       )}
@@ -279,18 +279,18 @@ export function CommandCenter() {
 
       {/* Charts: pipeline + market value */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Pipeline Distribution")}</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-foreground mb-3">{t("Pipeline Distribution")}</h2>
           <div className="h-64">
             <DeferredDonutChart label={t("Pipeline Distribution")} data={pipelineData} />
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Pipeline Value by Market (USD K)")}</h2>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-foreground mb-3">{t("Pipeline Value by Market (USD K)")}</h2>
           <div className="h-64">
             {marketValueData.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 {t("No pursuit data yet.")}</div>
             ) : (
               <DeferredBarChart label={t("Pipeline Value by Market (USD K)")} data={marketValueData} xKey="market" series={[{ key: "value", label: t("Pipeline Value"), color: "#0f172a" }]} margin={{ top: 4, right: 8, bottom: 4, left: 0 }} valueFormatter={value => `$${value}K`} />
@@ -301,75 +301,75 @@ export function CommandCenter() {
 
       {/* Recent pursuits + Recent awards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("Recent Pursuits")}</h2>
-            <button onClick={goPursuits} className="text-xs text-slate-500 hover:text-slate-900 flex items-center gap-1">
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">{t("Recent Pursuits")}</h2>
+            <button onClick={goPursuits} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">
               {t("View all")}<ArrowRight className="h-3 w-3" />
             </button>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.recentPursuits.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No pursuits yet.")}</div>
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("No pursuits yet.")}</div>
             ) : (
               data.recentPursuits.map((p) => (
                 <button
                   key={p.id}
                   onClick={() => openBidRoom(p.id)}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50 transition-colors"
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted transition-colors"
                 >
                   <span className={cn(
                     'text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded shrink-0',
-                    p.stage === 'bidding' ? 'bg-amber-500/15 text-amber-700' :
-                    p.stage === 'qualifying' ? 'bg-sky-500/15 text-sky-700' :
-                    p.stage === 'discovering' ? 'bg-slate-500/15 text-slate-700' :
-                    'bg-gray-500/15 text-gray-700'
+                    p.stage === 'bidding' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                    p.stage === 'qualifying' ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300' :
+                    p.stage === 'discovering' ? 'bg-slate-500/15 text-foreground' :
+                    'bg-gray-500/15 text-muted-foreground'
                   )}>
                     {p.stage}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{p.tender.title}</p>
+                    <p className="text-sm font-medium text-foreground truncate">{p.tender.title}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', marketColor(p.tender.market))}>
                         {marketLabel(p.tender.market)}
                       </span>
-                      <span className="text-xs text-slate-500">{formatUSD(p.estimatedValueUSD ?? p.tender.valueUSD)}</span>
+                      <span className="text-xs text-muted-foreground">{formatUSD(p.estimatedValueUSD ?? p.tender.valueUSD)}</span>
                       {p.tender.submissionDeadline && (
-                        <span className="text-xs text-slate-400">·</span>
+                        <span className="text-xs text-muted-foreground">·</span>
                       )}
                       {p.tender.submissionDeadline && (
-                        <span className="text-xs text-slate-500">{t("Due")}{' '}{formatDateTime(p.tender.submissionDeadline)}</span>
+                        <span className="text-xs text-muted-foreground">{t("Due")}{' '}{formatDateTime(p.tender.submissionDeadline)}</span>
                       )}
                     </div>
                   </div>
-                  <ArrowRight className="h-4 w-4 text-slate-400 shrink-0" />
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
                 </button>
               ))
             )}
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <h2 className="text-sm font-semibold text-slate-900">{t("Recent Awards (Intelligence)")}</h2>
-            <span className="text-xs text-slate-500">Award Intel · Phase 3</span>
+        <div className="rounded-lg border border-border bg-card">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <h2 className="text-sm font-semibold text-foreground">{t("Recent Awards (Intelligence)")}</h2>
+            <span className="text-xs text-muted-foreground">Award Intel · Phase 3</span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {data.recentAwards.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-slate-500">{t("No award intelligence yet.")}</div>
+              <div className="px-4 py-8 text-center text-sm text-muted-foreground">{t("No award intelligence yet.")}</div>
             ) : (
               data.recentAwards.map((a, i) => (
                 <div key={i} className="px-4 py-3">
-                  <p className="text-sm font-medium text-slate-900 truncate">{a.tender.title}</p>
+                  <p className="text-sm font-medium text-foreground truncate">{a.tender.title}</p>
                   <div className="flex items-center gap-2 mt-1">
                     <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', marketColor(a.tender.market))}>
                       {marketLabel(a.tender.market)}
                     </span>
-                    <span className="text-xs text-slate-600">{t("Awarded to")}{' '}<strong>{a.supplier}</strong></span>
-                    <span className="text-xs text-slate-400">·</span>
-                    <span className="text-xs font-medium text-slate-700">{formatUSD(a.contractValue)}</span>
+                    <span className="text-xs text-muted-foreground">{t("Awarded to")}{' '}<strong>{a.supplier}</strong></span>
+                    <span className="text-xs text-muted-foreground">·</span>
+                    <span className="text-xs font-medium text-foreground">{formatUSD(a.contractValue)}</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{formatDate(a.awardedAt)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{formatDate(a.awardedAt)}</p>
                 </div>
               ))
             )}
@@ -378,11 +378,11 @@ export function CommandCenter() {
       </div>
 
       {/* Footer note about Phase 1 scope */}
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-        <p className="text-xs text-slate-600 leading-relaxed">
-          <strong className="text-slate-900">Phase 1 MVP.</strong> All scores and KPIs are deterministic and computed from seeded demo data.
+      <div className="rounded-lg border border-border bg-muted p-4">
+        <p className="text-xs text-muted-foreground leading-relaxed">
+          <strong className="text-foreground">Phase 1 MVP.</strong> All scores and KPIs are deterministic and computed from seeded demo data.
           Live procurement source connectors, AI extraction, authentication, and file upload are scaffolded for Phase 2+.
-          See <code className="text-[11px] bg-white px-1 py-0.5 rounded border border-slate-200">PROJECT_STATE.md</code> for the authoritative status.
+          See <code className="text-[11px] bg-card px-1 py-0.5 rounded border border-border">PROJECT_STATE.md</code> for the authoritative status.
         </p>
       </div>
     </div>
@@ -405,30 +405,30 @@ function KpiTile({
   onClick?: () => void
 }) {
   const toneMap: Record<string, string> = {
-    emerald: 'text-emerald-600 bg-emerald-500/10',
-    sky: 'text-sky-600 bg-sky-500/10',
-    violet: 'text-violet-600 bg-violet-500/10',
-    rose: 'text-rose-600 bg-rose-500/10',
-    amber: 'text-amber-600 bg-amber-500/10',
-    slate: 'text-slate-600 bg-slate-500/10',
+    emerald: 'text-emerald-600 bg-emerald-500/10 dark:text-emerald-300',
+    sky: 'text-sky-600 bg-sky-500/10 dark:text-sky-300',
+    violet: 'text-violet-600 bg-violet-500/10 dark:text-violet-300',
+    rose: 'text-rose-600 bg-rose-500/10 dark:text-rose-300',
+    amber: 'text-amber-600 bg-amber-500/10 dark:text-amber-300',
+    slate: 'text-muted-foreground bg-slate-500/10',
   }
   return (
     <button
       onClick={onClick}
       disabled={!onClick}
       className={cn(
-        'flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3 text-left transition-all',
-        onClick && 'hover:border-slate-300 hover:shadow-sm cursor-pointer'
+        'flex flex-col gap-1 rounded-lg border border-border bg-card p-3 text-left transition-all',
+        onClick && 'hover:border-border hover:shadow-sm cursor-pointer'
       )}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</span>
         <div className={cn('rounded-md p-1', toneMap[tone])}>
           <Icon className="h-3 w-3" />
         </div>
       </div>
-      <span className="text-xl font-semibold text-slate-900">{value}</span>
-      {subtitle && <span className="text-[10px] text-slate-500">{subtitle}</span>}
+      <span className="text-xl font-semibold text-foreground">{value}</span>
+      {subtitle && <span className="text-[10px] text-muted-foreground">{subtitle}</span>}
     </button>
   )
 }
@@ -436,15 +436,15 @@ function KpiTile({
 function CommandCenterSkeleton() {
   return (
     <div className="space-y-6 animate-pulse">
-      <div className="h-8 w-64 bg-slate-200 rounded" />
+      <div className="h-8 w-64 bg-accent rounded" />
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         {Array.from({ length: 7 }).map((_, i) => (
-          <div key={i} className="h-24 bg-slate-100 rounded-lg" />
+          <div key={i} className="h-24 bg-muted rounded-lg" />
         ))}
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 h-96 bg-slate-100 rounded-lg" />
-        <div className="h-96 bg-slate-100 rounded-lg" />
+        <div className="lg:col-span-2 h-96 bg-muted rounded-lg" />
+        <div className="h-96 bg-muted rounded-lg" />
       </div>
     </div>
   )

@@ -8,7 +8,7 @@ import type { BarChartPanelProps, DonutChartPanelProps, LineChartPanelProps } fr
 
 function ChartLoading() {
   const { t } = useTranslation()
-  return <div role="status" className="flex h-full w-full items-center justify-center rounded bg-slate-50 text-xs text-slate-500">{t('common.loading')}</div>
+  return <div role="status" className="flex h-full w-full items-center justify-center rounded bg-muted text-xs text-muted-foreground">{t('common.loading')}</div>
 }
 const LazyBar = dynamic(() => import('./chart-panels').then(module => module.BarChartPanel), { ssr: false, loading: ChartLoading })
 const LazyDonut = dynamic(() => import('./chart-panels').then(module => module.DonutChartPanel), { ssr: false, loading: ChartLoading })

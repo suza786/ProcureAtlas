@@ -116,19 +116,19 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
   }
 
   return (
-    <aside className={cn(mobile ? "flex h-full w-full" : "hidden md:flex w-60", "shrink-0 flex-col border-r border-slate-200 bg-white")}>
-      <div className="flex h-14 items-center gap-2 border-b border-slate-200 px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-900 text-white text-xs font-bold">
+    <aside className={cn(mobile ? "flex h-full w-full" : "hidden md:flex w-60", "shrink-0 flex-col border-r border-border bg-card")}>
+      <div className="flex h-14 items-center gap-2 border-b border-border px-4">
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
           PA
         </div>
         <div className="flex flex-col leading-none">
-          <span className="text-sm font-semibold text-slate-900">ProcureAtlas</span>
-          <span className="text-[10px] uppercase tracking-wider text-slate-500">AI Intelligence · Phase 6</span>
+          <span className="text-sm font-semibold text-foreground">ProcureAtlas</span>
+          <span className="text-[10px] uppercase tracking-wider text-muted-foreground">AI Intelligence · Phase 6</span>
         </div>
       </div>
 
       <nav aria-label={t('nav.workspace')} className="flex-1 overflow-y-auto p-3">
-        <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <div className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {t('nav.workspace')}
         </div>
         <ul className="space-y-0.5">
@@ -143,8 +143,8 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
                     active
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-700 hover:bg-slate-100'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-foreground hover:bg-muted'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -155,7 +155,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
           })}
         </ul>
 
-        <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {t('nav.intelligence')}
         </div>
         <ul className="space-y-0.5">
@@ -169,7 +169,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
                   onClick={() => { actionMap[item.action](); onNavigate?.() }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-                    active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                    active ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -180,7 +180,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
           })}
         </ul>
 
-        <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+        <div className="mt-6 mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {t('nav.system')}
         </div>
         <ul className="space-y-0.5">
@@ -194,7 +194,7 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
                   onClick={() => { actionMap[item.action](); onNavigate?.() }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-sm font-medium transition-colors',
-                    active ? 'bg-slate-900 text-white' : 'text-slate-700 hover:bg-slate-100'
+                    active ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted'
                   )}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -206,8 +206,8 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
         </ul>
       </nav>
 
-      <div className="border-t border-slate-200 p-3">
-        <div className="rounded-md bg-slate-50 p-3">
+      <div className="border-t border-border p-3">
+        <div className="rounded-md bg-muted p-3">
           <div className="flex items-center gap-2">
             <div className={cn(
               'flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white',
@@ -216,10 +216,10 @@ export function Sidebar({ mobile = false, onNavigate }: { mobile?: boolean; onNa
               {auth.user?.name?.[0] ?? 'D'}
             </div>
             <div className="flex flex-col leading-tight flex-1 min-w-0">
-              <span className="text-xs font-semibold text-slate-900 truncate">
+              <span className="text-xs font-semibold text-foreground truncate">
                 {auth.user?.name ?? t('shell.demoMode')}
               </span>
-              <span className="text-[10px] text-slate-500 truncate">
+              <span className="text-[10px] text-muted-foreground truncate">
                 {auth.authenticated ? auth.user?.role : t('shell.notSignedIn')}
               </span>
             </div>

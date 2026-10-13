@@ -94,47 +94,47 @@ export function Billing() {
     finally { setChangingPlan(null) }
   }
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading billing data...")}</div>
-  if (!data) return <div role="alert" className="p-6 text-sm text-rose-600">{error ?? 'Failed to load.'} <button onClick={load} className="underline">{t("Retry")}</button></div>
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">{t("Loading billing data...")}</div>
+  if (!data) return <div role="alert" className="p-6 text-sm text-rose-600 dark:text-rose-300">{error ?? 'Failed to load.'} <button onClick={load} className="underline">{t("Retry")}</button></div>
 
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-          <CreditCard className="h-6 w-6 text-slate-700" />
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+          <CreditCard className="h-6 w-6 text-foreground" />
           {t("Billing & Usage")}</h1>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Current plan, usage metrics, and plan selection.
         </p>
       </div>
-      {error && <p role="alert" className="text-sm text-rose-700">{error}</p>}
+      {error && <p role="alert" className="text-sm text-rose-700 dark:text-rose-300">{error}</p>}
 
       {/* Current plan */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{t("Current Plan")}</p>
-            <p className="text-2xl font-semibold text-slate-900 capitalize">{data.subscription.plan}</p>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{t("Current Plan")}</p>
+            <p className="text-2xl font-semibold text-foreground capitalize">{data.subscription.plan}</p>
+            <p className="text-xs text-muted-foreground mt-1">
               {data.subscription.billingCycle} billing · {data.subscription.seatsIncluded} seat(s) ·
-              Status: <span className="font-medium text-emerald-700">{data.subscription.status}</span>
+              Status: <span className="font-medium text-emerald-700 dark:text-emerald-300">{data.subscription.status}</span>
             </p>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {t("Period:")}{formatDate(data.subscription.currentPeriodStart)} → {formatDate(data.subscription.currentPeriodEnd)}
             </p>
           </div>
           {data.subscription.cancelAtPeriodEnd && (
-            <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700">
+            <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
               {t("cancels at period end")}</span>
           )}
         </div>
       </div>
 
       {/* Usage meters */}
-      {data.tokenAccounting && <p className="text-xs text-slate-600">{t("Provider usage:")}{' '}{data.tokenAccounting.reportedCalls} reported calls, {data.tokenAccounting.estimatedCalls} estimated calls. {data.reservedTokens} tokens reserved for {data.tokenAccounting.unsettledCalls} calls awaiting usage confirmation.</p>}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
-          <TrendingUp className="h-4 w-4 text-violet-600" />
+      {data.tokenAccounting && <p className="text-xs text-muted-foreground">{t("Provider usage:")}{' '}{data.tokenAccounting.reportedCalls} reported calls, {data.tokenAccounting.estimatedCalls} estimated calls. {data.reservedTokens} tokens reserved for {data.tokenAccounting.unsettledCalls} calls awaiting usage confirmation.</p>}
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+          <TrendingUp className="h-4 w-4 text-violet-600 dark:text-violet-300" />
           {t("Current Period Usage")}</h2>
         <div className="space-y-3">
           {data.usage.map((u) => {
@@ -145,14 +145,14 @@ export function Billing() {
               <div key={u.metricType}>
                 <div className="flex items-center justify-between text-xs mb-1">
                   <div className="flex items-center gap-2">
-                    <Icon className="h-3.5 w-3.5 text-slate-400" />
-                    <span className="font-medium text-slate-700">{u.metricType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="font-medium text-foreground">{u.metricType.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
                   </div>
-                  <span className={cn('font-medium', isOver ? 'text-rose-600' : 'text-slate-700')}>
+                  <span className={cn('font-medium', isOver ? 'text-rose-600 dark:text-rose-300' : 'text-foreground')}>
                     {u.used.toLocaleString()} / {u.limit.toLocaleString()} ({u.percentage}%)
                   </span>
                 </div>
-                <div className="w-full bg-slate-100 rounded-full h-2">
+                <div className="w-full bg-muted rounded-full h-2">
                   <div
                     className={cn(
                       'h-full rounded-full transition-all',
@@ -168,8 +168,8 @@ export function Billing() {
       </div>
 
       {/* Plan selection */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <h2 className="text-sm font-semibold text-slate-900 mb-3">{t("Available Plans")}</h2>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <h2 className="text-sm font-semibold text-foreground mb-3">{t("Available Plans")}</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {Object.values(PLANS).map((p) => {
             const isCurrent = data.subscription.plan === p.id
@@ -178,17 +178,17 @@ export function Billing() {
                 key={p.id}
                 className={cn(
                   'rounded-lg border p-3 text-center',
-                  isCurrent ? 'border-slate-900 bg-slate-50' : 'border-slate-200'
+                  isCurrent ? 'border-primary bg-muted' : 'border-border'
                 )}
               >
-                <p className="text-sm font-semibold text-slate-900">{p.name}</p>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-sm font-semibold text-foreground">{p.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {p.priceUSD === -1 ? 'Contact for quote' : `$${p.priceUSD}/mo`}
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[10px] text-muted-foreground">
                   {p.priceBDT === -1 ? '' : p.priceBDT === 0 ? 'Free' : `৳${p.priceBDT}/mo`}
                 </p>
-                <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-600 space-y-0.5 text-left">
+                <div className="mt-2 pt-2 border-t border-border text-[10px] text-muted-foreground space-y-0.5 text-left">
                   <p>{p.seats} seat(s)</p>
                   <p>{p.tenders} tenders</p>
                   <p>{p.pursuits} pursuits</p>
@@ -196,13 +196,13 @@ export function Billing() {
                   <p>{p.llmTokens.toLocaleString()} LLM tokens</p>
                 </div>
                 {isCurrent ? (
-                  <div className="mt-2 text-xs font-medium text-emerald-700 flex items-center justify-center gap-1">
+                  <div className="mt-2 text-xs font-medium text-emerald-700 flex items-center justify-center gap-1 dark:text-emerald-300">
                     <CheckCircle2 className="h-3 w-3" /> {t("Current")}</div>
                 ) : (
                   <button
                     onClick={() => changePlan(p.id)}
                     disabled={changingPlan !== null || !data.subscription.directSwitchEnabled}
-                    className="mt-2 w-full rounded-md bg-slate-900 px-2 py-1 text-[10px] font-medium text-white hover:bg-slate-800 disabled:opacity-50 flex items-center justify-center gap-1"
+                    className="mt-2 w-full rounded-md bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 flex items-center justify-center gap-1"
                   >
                     {changingPlan === p.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : null}
                     {data.subscription.directSwitchEnabled ? `Switch to ${p.name}` : 'Requires verified billing'}
@@ -215,31 +215,31 @@ export function Billing() {
       </div>
 
       {/* Invoices */}
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3">
-          <h2 className="text-sm font-semibold text-slate-900">{t("Invoices")}</h2>
+      <div className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-semibold text-foreground">{t("Invoices")}</h2>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-border">
           {data.invoices.length === 0 ? (
-            <div className="p-6 text-center text-sm text-slate-500">
+            <div className="p-6 text-center text-sm text-muted-foreground">
               {t("No invoices yet. Invoices are generated at the end of each billing period.")}</div>
           ) : (
             data.invoices.map((inv) => (
               <div key={inv.id} className="px-4 py-2.5 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-slate-900">{inv.invoiceNumber}</p>
-                  <p className="text-xs text-slate-500">{formatDate(inv.periodStart)} → {formatDate(inv.periodEnd)}</p>
+                  <p className="text-sm font-medium text-foreground">{inv.invoiceNumber}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(inv.periodStart)} → {formatDate(inv.periodEnd)}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className={cn(
                     'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-                    inv.status === 'paid' ? 'bg-emerald-500/15 text-emerald-700' :
-                    inv.status === 'pending' ? 'bg-amber-500/15 text-amber-700' :
-                    'bg-slate-500/15 text-slate-600'
+                    inv.status === 'paid' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+                    inv.status === 'pending' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                    'bg-slate-500/15 text-muted-foreground'
                   )}>
                     {inv.status}
                   </span>
-                  <span className="text-sm font-semibold text-slate-900">{formatCurrencyAmount(inv.amount, inv.currency)}</span>
+                  <span className="text-sm font-semibold text-foreground">{formatCurrencyAmount(inv.amount, inv.currency)}</span>
                 </div>
               </div>
             ))
@@ -247,7 +247,7 @@ export function Billing() {
         </div>
       </div>
 
-      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800">
+      <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-800 dark:text-amber-300">
         <div className="flex items-start gap-2">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
           <div>

@@ -91,13 +91,13 @@ interface TenderDetail {
 
 
 const CATEGORY_COLOR: Record<string, string> = {
-  eligibility: 'bg-sky-500/15 text-sky-700 border-sky-500/30',
-  technical: 'bg-violet-500/15 text-violet-700 border-violet-500/30',
-  financial: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30',
-  legal: 'bg-slate-500/15 text-slate-700 border-slate-500/30',
-  experience: 'bg-amber-500/15 text-amber-700 border-amber-500/30',
-  certification: 'bg-rose-500/15 text-rose-700 border-rose-500/30',
-  document: 'bg-gray-500/15 text-gray-700 border-gray-500/30',
+  eligibility: 'bg-sky-500/15 text-sky-700 border-sky-500/30 dark:text-sky-300',
+  technical: 'bg-violet-500/15 text-violet-700 border-violet-500/30 dark:text-violet-300',
+  financial: 'bg-emerald-500/15 text-emerald-700 border-emerald-500/30 dark:text-emerald-300',
+  legal: 'bg-slate-500/15 text-foreground border-slate-500/30',
+  experience: 'bg-amber-500/15 text-amber-700 border-amber-500/30 dark:text-amber-300',
+  certification: 'bg-rose-500/15 text-rose-700 border-rose-500/30 dark:text-rose-300',
+  document: 'bg-gray-500/15 text-muted-foreground border-gray-500/30',
 }
 
 export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
@@ -126,8 +126,8 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
     return () => { cancelled = true }
   }, [tenderId])
 
-  if (loading) return <div className="p-6 text-sm text-slate-500">{t("Loading tender digital twin...")}</div>
-  if (!tender) return <div className="p-6 text-sm text-rose-600">{t("Tender not found.")}</div>
+  if (loading) return <div className="p-6 text-sm text-muted-foreground">{t("Loading tender digital twin...")}</div>
+  if (!tender) return <div className="p-6 text-sm text-rose-600 dark:text-rose-300">{t("Tender not found.")}</div>
 
   const deadlineDays = daysUntil(tender.submissionDeadline)
   const urgency = deadlineUrgency(tender.submissionDeadline)
@@ -137,7 +137,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
       {/* Back button */}
       <button
         onClick={goDiscover}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-900 transition-colors"
+        className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
         <ArrowLeft className="h-3.5 w-3.5" /> {t("Back to Discover")}</button>
 
@@ -151,35 +151,35 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
             {tender.sector}
           </span>
           {tender.procurementMethod && (
-            <span className="text-[10px] uppercase tracking-wider text-slate-500">{tender.procurementMethod}</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{tender.procurementMethod}</span>
           )}
           {tender.noticeType && (
-            <span className="text-[10px] uppercase tracking-wider text-slate-500">{tender.noticeType}</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">{tender.noticeType}</span>
           )}
           {tender.status !== 'active' && (
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-medium">
               {tender.status}
             </span>
           )}
           {tender.amendments.length > 0 && (
-            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-medium flex items-center gap-1">
+            <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 font-medium flex items-center gap-1 dark:text-amber-300">
               <AlertTriangle className="h-3 w-3" /> {tender.amendments.length} amendment(s)
             </span>
           )}
         </div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">{tender.title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{tender.title}</h1>
         {tender.titleLocal && (
-          <p className="text-sm text-slate-500" lang="bn">{tender.titleLocal}</p>
+          <p className="text-sm text-muted-foreground" lang="bn">{tender.titleLocal}</p>
         )}
-        <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span>{t("Source:")}{' '}<strong className="text-slate-700">{tender.sourcePortal}</strong></span>
-          <span>{t("External ID:")}{' '}<code className="bg-slate-100 px-1 py-0.5 rounded">{tender.externalId ?? '—'}</code></span>
-          <span>{t("Confidence:")}{' '}<strong className="text-slate-700">{Math.round(tender.confidence * 100)}%</strong></span>
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <span>{t("Source:")}{' '}<strong className="text-foreground">{tender.sourcePortal}</strong></span>
+          <span>{t("External ID:")}{' '}<code className="bg-muted px-1 py-0.5 rounded">{tender.externalId ?? '—'}</code></span>
+          <span>{t("Confidence:")}{' '}<strong className="text-foreground">{Math.round(tender.confidence * 100)}%</strong></span>
           <a
             href={tender.sourceUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 text-sky-700 hover:text-sky-900"
+            className="flex items-center gap-1 text-sky-700 hover:text-sky-900 dark:text-sky-300 dark:hover:text-sky-300"
           >
             {t("View on portal")}<ExternalLink className="h-3 w-3" />
           </a>
@@ -231,20 +231,20 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
               <span className="text-[9px] uppercase tracking-wider opacity-80">days left</span>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-slate-900">{t("Submission Deadline")}</p>
-              <p className="text-xs text-slate-600">{formatDateTime(tender.submissionDeadline)}</p>
+              <p className="text-sm font-semibold text-foreground">{t("Submission Deadline")}</p>
+              <p className="text-xs text-muted-foreground">{formatDateTime(tender.submissionDeadline)}</p>
             </div>
             {tender.questionDeadline && (
-              <div className="text-right text-xs text-slate-600">
+              <div className="text-right text-xs text-muted-foreground">
                 <p className="font-medium">{t("Question deadline")}</p>
                 <p>{formatDateTime(tender.questionDeadline)}</p>
-                <p className="text-[10px] text-slate-400">({daysUntil(tender.questionDeadline)}d)</p>
+                <p className="text-[10px] text-muted-foreground">({daysUntil(tender.questionDeadline)}d)</p>
               </div>
             )}
             {scoring?.pursuitId ? (
               <button
                 onClick={() => useAppStore.getState().openBidRoom(scoring.pursuitId!)}
-                className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5"
               >
                 <Target className="h-3.5 w-3.5" /> {t("Open Bid Room")}</button>
             ) : (
@@ -261,7 +261,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
                     useAppStore.getState().openBidRoom(p.id)
                   } catch (error) { toast.error(error instanceof Error ? error.message : t("Unable to create pursuit")) }
                 }}
-                className="rounded-md bg-slate-900 px-3 py-2 text-xs font-medium text-white hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                className="rounded-md bg-primary px-3 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors flex items-center gap-1.5"
               >
                 <Target className="h-3.5 w-3.5" /> {t("Create Pursuit")}</button>
             )}
@@ -295,7 +295,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
                 }
               }}
               disabled={extracting}
-              className="rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-700 hover:bg-violet-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50"
+              className="rounded-md border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs font-medium text-violet-700 hover:bg-violet-500/20 transition-colors flex items-center gap-1.5 disabled:opacity-50 dark:text-violet-300"
               title="Trigger LLM extraction. Output is pending human review — nothing is written to the Requirement table until approved."
             >
               {extracting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
@@ -306,7 +306,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
       )}
 
       {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-slate-200">
+      <div className="flex items-center gap-1 border-b border-border">
         {[
           { id: 'overview', label: 'Overview', icon: FileText },
           { id: 'requirements', label: `Requirements (${tender.requirements.length})`, icon: CheckCircle2 },
@@ -323,8 +323,8 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors',
                 activeTab === t.id
-                  ? 'border-slate-900 text-slate-900'
-                  : 'border-transparent text-slate-500 hover:text-slate-900'
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -335,7 +335,7 @@ export function TenderDigitalTwin({ tenderId }: { tenderId: string }) {
       </div>
 
       {/* Tab content */}
-      <div className="rounded-lg border border-slate-200 bg-white p-4">
+      <div className="rounded-lg border border-border bg-card p-4">
         {activeTab === 'overview' && <OverviewTab tender={tender} />}
         {activeTab === 'requirements' && <RequirementsTab tender={tender} />}
         {activeTab === 'extraction' && <ExtractionTab tenderId={tender.id} result={extractionResult} extracting={extracting} onNavigateToQueue={() => useAppStore.getState().goExtractions()} />}
@@ -358,29 +358,29 @@ function ScoreCard({
   blockedReason?: string
 }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-border bg-card p-4">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">{label}</span>
+        <span className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">{label}</span>
         <span className={cn(
           'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-          blocked ? 'bg-rose-500/15 text-rose-700' :
-          band === 'high' ? 'bg-emerald-500/15 text-emerald-700' :
-          band === 'medium' ? 'bg-amber-500/15 text-amber-700' :
-          'bg-slate-500/15 text-slate-700'
+          blocked ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+          band === 'high' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+          band === 'medium' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+          'bg-slate-500/15 text-foreground'
         )}>
           {blocked ? 'blocked' : band}
         </span>
       </div>
       <div className="flex items-end gap-2 mb-2">
         <span className={cn('text-3xl font-bold', scoreColor(score))}>{score}</span>
-        <span className="text-sm text-slate-400 mb-1">/100</span>
+        <span className="text-sm text-muted-foreground mb-1">/100</span>
       </div>
-      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+      <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
         <div className={cn('h-full rounded-full transition-all', scoreBg(score))} style={{ width: `${score}%` }} />
       </div>
-      <p className="text-xs text-slate-500 mt-2">{subtext}</p>
+      <p className="text-xs text-muted-foreground mt-2">{subtext}</p>
       {blocked && blockedReason && (
-        <p className="text-xs text-rose-700 mt-1 flex items-start gap-1">
+        <p className="text-xs text-rose-700 mt-1 flex items-start gap-1 dark:text-rose-300">
           <XCircle className="h-3 w-3 mt-0.5 shrink-0" />
           <span>{blockedReason}</span>
         </p>
@@ -396,42 +396,42 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       <div className="space-y-4">
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Description")}</h3>
-          <p className="text-sm text-slate-700 leading-relaxed">{tender.description ?? 'No description available.'}</p>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">{t("Description")}</h3>
+          <p className="text-sm text-foreground leading-relaxed">{tender.description ?? 'No description available.'}</p>
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Buyer")}</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">{t("Buyer")}</h3>
           {tender.buyer ? (
             <div className="flex items-start gap-2">
-              <Building2 className="h-4 w-4 text-slate-400 mt-0.5" />
+              <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-slate-900">{tender.buyer.name}</p>
-                <p className="text-xs text-slate-500">
+                <p className="text-sm font-medium text-foreground">{tender.buyer.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {[tender.buyer.city, tender.buyer.country].filter(Boolean).join(', ')}
                 </p>
                 {tender.buyer.website && (
-                  <a href={tender.buyer.website} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-1">
+                  <a href={tender.buyer.website} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-1 dark:text-sky-300 dark:hover:text-sky-300">
                     {tender.buyer.website} <ExternalLink className="h-3 w-3" />
                   </a>
                 )}
               </div>
             </div>
-          ) : <p className="text-sm text-slate-500">{t("Unknown buyer.")}</p>}
+          ) : <p className="text-sm text-muted-foreground">{t("Unknown buyer.")}</p>}
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Contact")}</h3>
-          <div className="text-xs text-slate-700 space-y-1">
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">{t("Contact")}</h3>
+          <div className="text-xs text-foreground space-y-1">
             <p>{tender.contactPerson ?? '—'}</p>
-            {tender.contactEmail && <p className="text-sky-700">{tender.contactEmail}</p>}
+            {tender.contactEmail && <p className="text-sky-700 dark:text-sky-300">{tender.contactEmail}</p>}
           </div>
         </div>
       </div>
 
       <div className="space-y-4">
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Financial")}</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">{t("Financial")}</h3>
           <div className="grid grid-cols-2 gap-2 text-xs">
             <Stat label={t("Estimated Value")} value={`${formatUSD(tender.valueUSD)}`} sub={tender.currency !== 'USD' ? `${formatUSD(tender.estimatedValue)} ${tender.currency}` : undefined} />
             <Stat label={t("Tender Security")} value={tender.tenderSecurityPct !== null ? `${tender.tenderSecurityPct}%` : '—'} />
@@ -441,7 +441,7 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
         </div>
 
         <div>
-          <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">{t("Timeline")}</h3>
+          <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">{t("Timeline")}</h3>
           <div className="space-y-1.5 text-xs">
             <TimelineRow icon={Calendar} label={t("Published")} value={formatDate(tender.publishedAt)} />
             {tender.preBidMeetingAt && (
@@ -456,15 +456,15 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
 
         {tender.lots.length > 0 && (
           <div>
-            <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Lots ({tender.lots.length})</h3>
+            <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Lots ({tender.lots.length})</h3>
             <div className="space-y-2">
               {tender.lots.map(l => (
-                <div key={l.id} className="flex items-center justify-between rounded-md border border-slate-200 px-3 py-2 text-xs">
+                <div key={l.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-xs">
                   <div>
-                    <p className="font-medium text-slate-900">{l.title}</p>
-                    {l.description && <p className="text-slate-500 mt-0.5">{l.description}</p>}
+                    <p className="font-medium text-foreground">{l.title}</p>
+                    {l.description && <p className="text-muted-foreground mt-0.5">{l.description}</p>}
                   </div>
-                  <span className="font-semibold text-slate-700">{formatUSD(l.estimatedValue)} <span className="text-[10px] text-slate-500">{l.currency}</span></span>
+                  <span className="font-semibold text-foreground">{formatUSD(l.estimatedValue)} <span className="text-[10px] text-muted-foreground">{l.currency}</span></span>
                 </div>
               ))}
             </div>
@@ -473,15 +473,15 @@ function OverviewTab({ tender }: { tender: TenderDetail }) {
 
         {tender.documents.length > 0 && (
           <div>
-            <h3 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Documents ({tender.documents.length})</h3>
+            <h3 className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">Documents ({tender.documents.length})</h3>
             <div className="space-y-1">
               {tender.documents.map(d => (
                 <div key={d.id} className="flex items-center gap-2 text-xs">
-                  <FileText className="h-3.5 w-3.5 text-slate-400" />
-                  <span className="font-medium text-slate-700">{d.name}</span>
-                  {d.docType && <span className="text-[10px] text-slate-500">· {d.docType}</span>}
+                  <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="font-medium text-foreground">{d.name}</span>
+                  {d.docType && <span className="text-[10px] text-muted-foreground">· {d.docType}</span>}
                   {d.sourceUrl && (
-                    <a href={d.sourceUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-sky-700 hover:text-sky-900 flex items-center gap-1">
+                    <a href={d.sourceUrl} target="_blank" rel="noopener noreferrer" className="ml-auto text-sky-700 hover:text-sky-900 flex items-center gap-1 dark:text-sky-300 dark:hover:text-sky-300">
                       <Download className="h-3 w-3" /> {t("Open")}</a>
                   )}
                 </div>
@@ -498,43 +498,43 @@ function RequirementsTab({ tender }: { tender: TenderDetail }) {
   const { t } = useTranslation()
 
   if (tender.requirements.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">{t("No structured requirements extracted yet.")}</div>
+    return <div className="p-6 text-center text-sm text-muted-foreground">{t("No structured requirements extracted yet.")}</div>
   }
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted-foreground">
           Every requirement retains its source: document, page, clause, and extracted text. Hover for the original clause.
         </p>
       </div>
       {tender.requirements.map(r => (
-        <div key={r.id} className="rounded-md border border-slate-200 p-3">
+        <div key={r.id} className="rounded-md border border-border p-3">
           <div className="flex items-start gap-3">
             <div className="flex flex-col items-center mt-0.5">
               {r.isMandatory ? (
-                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700">{t("Mandatory")}</span>
+                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 dark:text-rose-300">{t("Mandatory")}</span>
               ) : (
-                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">{t("Optional")}</span>
+                <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">{t("Optional")}</span>
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', CATEGORY_COLOR[r.category] ?? 'bg-gray-500/15 text-gray-700')}>
+                <span className={cn('text-[10px] px-1.5 py-0.5 rounded border font-medium', CATEGORY_COLOR[r.category] ?? 'bg-gray-500/15 text-muted-foreground')}>
                   {r.category}
                 </span>
-                <p className="text-sm font-medium text-slate-900">{r.criterion}</p>
+                <p className="text-sm font-medium text-foreground">{r.criterion}</p>
                 {r.threshold && (
-                  <span className="text-xs text-slate-500">
-                    {r.operator} <strong className="text-slate-700">{r.threshold}</strong>
+                  <span className="text-xs text-muted-foreground">
+                    {r.operator} <strong className="text-foreground">{r.threshold}</strong>
                   </span>
                 )}
               </div>
               {r.source.extractedText && (
-                <p className="text-xs text-slate-600 mt-1.5 italic leading-relaxed">
+                <p className="text-xs text-muted-foreground mt-1.5 italic leading-relaxed">
                   &ldquo;{r.source.extractedText}&rdquo;
                 </p>
               )}
-              <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+              <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground">
                 {r.source.doc && <span>{r.source.doc}</span>}
                 {r.source.page && <span>p.{r.source.page}</span>}
                 {r.source.clause && <span>§ {r.source.clause}</span>}
@@ -552,29 +552,29 @@ function AmendmentsTab({ tender }: { tender: TenderDetail }) {
   const { t, formatDate, formatDateTime } = useTranslation()
 
   if (tender.amendments.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">{t("No amendments published.")}</div>
+    return <div className="p-6 text-center text-sm text-muted-foreground">{t("No amendments published.")}</div>
   }
   return (
     <div className="space-y-3">
       {tender.amendments.map(a => (
         <div key={a.id} className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700">
+            <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300">
               Amendment #{a.amendmentNo}
             </span>
-            <span className="text-xs text-slate-500">{formatDate(a.publishedAt)}</span>
+            <span className="text-xs text-muted-foreground">{formatDate(a.publishedAt)}</span>
             {a.affectsDeadline && (
-              <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 flex items-center gap-1">
+              <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-700 flex items-center gap-1 dark:text-rose-300">
                 <Clock className="h-3 w-3" /> {t("Affects deadline")}</span>
             )}
           </div>
-          <p className="text-sm font-medium text-slate-900">{a.title}</p>
-          <p className="text-xs text-slate-600 mt-1">{a.description}</p>
+          <p className="text-sm font-medium text-foreground">{a.title}</p>
+          <p className="text-xs text-muted-foreground mt-1">{a.description}</p>
           {a.newDeadline && (
-            <p className="text-xs text-rose-700 mt-1 font-medium">{t("New deadline:")}{' '}{formatDateTime(a.newDeadline)}</p>
+            <p className="text-xs text-rose-700 mt-1 font-medium dark:text-rose-300">{t("New deadline:")}{' '}{formatDateTime(a.newDeadline)}</p>
           )}
           {a.sourceUrl && (
-            <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2">
+            <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2 dark:text-sky-300 dark:hover:text-sky-300">
               {t("View source")}<ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -588,26 +588,26 @@ function AwardsTab({ tender }: { tender: TenderDetail }) {
   const { t, formatDate } = useTranslation()
 
   if (tender.awards.length === 0) {
-    return <div className="p-6 text-center text-sm text-slate-500">{t("No award information published.")}</div>
+    return <div className="p-6 text-center text-sm text-muted-foreground">{t("No award information published.")}</div>
   }
   return (
     <div className="space-y-3">
       {tender.awards.map(a => (
-        <div key={a.id} className="rounded-md border border-slate-200 p-3">
+        <div key={a.id} className="rounded-md border border-border p-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-slate-900">{a.supplier}</p>
-              {a.supplierCountry && <p className="text-xs text-slate-500 mt-0.5">{a.supplierCountry}</p>}
-              {a.contractNo && <p className="text-xs text-slate-500">Contract # {a.contractNo}</p>}
+              <p className="text-sm font-medium text-foreground">{a.supplier}</p>
+              {a.supplierCountry && <p className="text-xs text-muted-foreground mt-0.5">{a.supplierCountry}</p>}
+              {a.contractNo && <p className="text-xs text-muted-foreground">Contract # {a.contractNo}</p>}
             </div>
             <div className="text-right">
-              <p className="text-sm font-semibold text-slate-900">{formatUSD(a.contractValue)}</p>
-              <p className="text-[10px] text-slate-500">{a.currency}</p>
-              <p className="text-xs text-slate-500 mt-1">{formatDate(a.awardedAt)}</p>
+              <p className="text-sm font-semibold text-foreground">{formatUSD(a.contractValue)}</p>
+              <p className="text-[10px] text-muted-foreground">{a.currency}</p>
+              <p className="text-xs text-muted-foreground mt-1">{formatDate(a.awardedAt)}</p>
             </div>
           </div>
           {a.sourceUrl && (
-            <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2">
+            <a href={a.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-sky-700 hover:text-sky-900 flex items-center gap-1 mt-2 dark:text-sky-300 dark:hover:text-sky-300">
               {t("View award notice")}<ExternalLink className="h-3 w-3" />
             </a>
           )}
@@ -625,8 +625,8 @@ function ScoringTab({ scoring }: { scoring: ScoringResult }) {
       <ScoreSection title={t("Eligibility Score")} score={scoring.eligibility} />
       <ScoreSection title={t("Opportunity Fit Score")} score={scoring.opportunityFit} />
       {scoring.submissionReadiness && <ScoreSection title={t("Submission Readiness Score")} score={scoring.submissionReadiness} />}
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <strong className="text-slate-900">{t("Engine:")}</strong> {scoring.engine} · Generated {formatDateTime(scoring.generatedAt)}.
+      <div className="rounded-md border border-border bg-muted p-3 text-xs text-muted-foreground">
+        <strong className="text-foreground">{t("Engine:")}</strong> {scoring.engine} · Generated {formatDateTime(scoring.generatedAt)}.
         All scores are deterministic. LLM extraction is not invoked for scoring.
       </div>
     </div>
@@ -640,22 +640,22 @@ function ScoreSection({ title, score }: {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         <div className="flex items-center gap-2">
           <span className={cn('text-2xl font-bold', scoreColor(score.total))}>{score.total}</span>
-          <span className="text-xs text-slate-400">/100</span>
+          <span className="text-xs text-muted-foreground">/100</span>
           <span className={cn(
             'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-            score.band === 'high' ? 'bg-emerald-500/15 text-emerald-700' :
-            score.band === 'medium' ? 'bg-amber-500/15 text-amber-700' :
-            score.band === 'blocked' ? 'bg-rose-500/15 text-rose-700' :
-            'bg-slate-500/15 text-slate-700'
+            score.band === 'high' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+            score.band === 'medium' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+            score.band === 'blocked' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+            'bg-slate-500/15 text-foreground'
           )}>{score.band}</span>
         </div>
       </div>
       <div className="space-y-1.5">
         {score.components.map((c, i) => (
-          <div key={i} className="flex items-start gap-3 rounded-md border border-slate-100 p-2">
+          <div key={i} className="flex items-start gap-3 rounded-md border border-border p-2">
             <div className={cn(
               'mt-0.5 h-2 w-2 rounded-full shrink-0',
               c.status === 'pass' ? 'bg-emerald-500' :
@@ -665,12 +665,12 @@ function ScoreSection({ title, score }: {
             )} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-medium text-slate-900">{c.criterion}</p>
-                <span className="text-[10px] text-slate-500">
+                <p className="text-xs font-medium text-foreground">{c.criterion}</p>
+                <span className="text-[10px] text-muted-foreground">
                   weight {c.weight} · score {Math.round(c.score * 100)}%
                 </span>
               </div>
-              <p className="text-xs text-slate-600 mt-0.5">{c.reason}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{c.reason}</p>
             </div>
           </div>
         ))}
@@ -681,10 +681,10 @@ function ScoreSection({ title, score }: {
 
 function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-md border border-slate-100 p-2">
-      <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">{label}</p>
-      <p className="text-sm font-semibold text-slate-900 mt-0.5">{value}</p>
-      {sub && <p className="text-[10px] text-slate-500">{sub}</p>}
+    <div className="rounded-md border border-border p-2">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</p>
+      <p className="text-sm font-semibold text-foreground mt-0.5">{value}</p>
+      {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
     </div>
   )
 }
@@ -697,9 +697,9 @@ function TimelineRow({ icon: Icon, label, value, highlight }: {
 }) {
   return (
     <div className="flex items-center gap-2">
-      <Icon className={cn('h-3.5 w-3.5', highlight ? 'text-rose-600' : 'text-slate-400')} />
-      <span className="text-slate-500">{label}:</span>
-      <span className={cn('font-medium', highlight ? 'text-rose-700' : 'text-slate-900')}>{value}</span>
+      <Icon className={cn('h-3.5 w-3.5', highlight ? 'text-rose-600 dark:text-rose-300' : 'text-muted-foreground')} />
+      <span className="text-muted-foreground">{label}:</span>
+      <span className={cn('font-medium', highlight ? 'text-rose-700 dark:text-rose-300' : 'text-foreground')}>{value}</span>
     </div>
   )
 }
@@ -722,10 +722,10 @@ function ExtractionTab({
     <div className="space-y-4">
       <div className="rounded-md border border-violet-500/30 bg-violet-500/5 p-3">
         <div className="flex items-start gap-2">
-          <Brain className="h-4 w-4 text-violet-700 shrink-0 mt-0.5" />
+          <Brain className="h-4 w-4 text-violet-700 shrink-0 mt-0.5 dark:text-violet-300" />
           <div className="text-xs">
-            <p className="font-semibold text-violet-900">{t("LLM Requirement Extraction")}</p>
-            <p className="text-violet-700 mt-1 leading-relaxed">
+            <p className="font-semibold text-violet-900 dark:text-violet-300">{t("LLM Requirement Extraction")}</p>
+            <p className="text-violet-700 mt-1 leading-relaxed dark:text-violet-300">
               Trigger an LLM call to extract structured requirements from the tender description.
               The LLM is sandboxed: untrusted tender text is wrapped in &lt;UNTRUSTED_DATA&gt; blocks,
               output is validated against a strict Zod schema, every extracted item must include a
@@ -737,8 +737,8 @@ function ExtractionTab({
       </div>
 
       {extracting && (
-        <div className="flex items-center gap-2 text-sm text-slate-600">
-          <Loader2 className="h-4 w-4 animate-spin text-violet-600" />
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin text-violet-600 dark:text-violet-300" />
           Calling LLM (glm-4.6)... this may take a few seconds.
         </div>
       )}
@@ -749,17 +749,17 @@ function ExtractionTab({
           result.success ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-rose-500/30 bg-rose-500/5'
         )}>
           <div className="flex items-start gap-2">
-            {result.success ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" /> : <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />}
+            {result.success ? <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5 dark:text-emerald-300" /> : <XCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5 dark:text-rose-300" />}
             <div className="flex-1">
-              <p className={cn('font-semibold', result.success ? 'text-emerald-800' : 'text-rose-800')}>
+              <p className={cn('font-semibold', result.success ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300')}>
                 {result.success ? `Extraction complete — ${result.itemCount} items extracted` : t("Extraction failed")}
               </p>
-              {result.error && <p className="text-rose-700 mt-1">{result.error}</p>}
-              {result.note && <p className="text-slate-700 mt-1">{result.note}</p>}
+              {result.error && <p className="text-rose-700 mt-1 dark:text-rose-300">{result.error}</p>}
+              {result.note && <p className="text-foreground mt-1">{result.note}</p>}
               {result.success && result.extractionId && (
                 <button
                   onClick={goExtractions}
-                  className="mt-2 text-violet-700 hover:text-violet-900 font-medium flex items-center gap-1"
+                  className="mt-2 text-violet-700 hover:text-violet-900 font-medium flex items-center gap-1 dark:text-violet-300 dark:hover:text-violet-300"
                 >
                   {t("Review in queue →")}</button>
               )}
@@ -771,13 +771,13 @@ function ExtractionTab({
       {!result && !extracting && (
         <div className="text-center py-8">
           <Sparkles className="h-8 w-8 text-violet-300 mx-auto mb-3" />
-          <p className="text-sm text-slate-500 mb-1">{t("No extraction run yet for this tender.")}</p>
-          <p className="text-xs text-slate-400">Click "Extract Requirements (LLM)" above to trigger an extraction.</p>
+          <p className="text-sm text-muted-foreground mb-1">{t("No extraction run yet for this tender.")}</p>
+          <p className="text-xs text-muted-foreground">Click "Extract Requirements (LLM)" above to trigger an extraction.</p>
         </div>
       )}
 
-      <div className="rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-        <p className="font-semibold text-slate-700 mb-1">{t("Guardrails in force")}</p>
+      <div className="rounded-md border border-border bg-muted p-3 text-xs text-muted-foreground">
+        <p className="font-semibold text-foreground mb-1">{t("Guardrails in force")}</p>
         <ul className="space-y-0.5 list-disc list-inside">
           <li>Backend-only LLM invocation (never client-side)</li>
           <li>Input sanitization — control chars stripped, length capped at 32k chars</li>

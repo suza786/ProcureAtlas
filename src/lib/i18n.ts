@@ -7,6 +7,12 @@ import { viewTranslations } from './view-translations'
 
 export const translations: Record<Locale, Record<string, string>> = {
   en: {
+    'appearance.title': 'Appearance',
+    'appearance.theme': 'Theme',
+    'appearance.help': 'Saved on this browser. System follows your device’s appearance.',
+    'appearance.light': 'Light',
+    'appearance.dark': 'Dark',
+    'appearance.system': 'System',
     // Sidebar
     'nav.workspace': 'Workspace',
     'nav.intelligence': 'Intelligence',
@@ -87,6 +93,12 @@ export const translations: Record<Locale, Record<string, string>> = {
   },
 
   bn: {
+    'appearance.title': 'চেহারা',
+    'appearance.theme': 'থিম',
+    'appearance.help': 'এই ব্রাউজারে সংরক্ষিত হয়। সিস্টেম আপনার ডিভাইসের থিম অনুসরণ করে।',
+    'appearance.light': 'হালকা',
+    'appearance.dark': 'গাঢ়',
+    'appearance.system': 'সিস্টেম',
     // Sidebar
     'nav.workspace': 'ওয়ার্কস্পেস',
     'nav.intelligence': 'ইন্টেলিজেন্স',

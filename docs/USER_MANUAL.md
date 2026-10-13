@@ -127,7 +127,15 @@ Before the team starts a real bid, the tenant administrator/operator should conf
 9. Ask a manager to progress the pursuit and review its mandatory requirements.
 10. Follow Sections 11–14 to prepare, approve and record the submission.
 
-### 3.3 Demonstration use
+### 3.3 Choose a theme
+
+1. Open **Settings → Appearance**.
+2. Under **Theme**, choose **Light**, **Dark**, or **System**.
+3. **System** follows your device’s appearance and updates when the device switches between light and dark modes.
+
+Your choice applies immediately across the workspace, including forms, dialogs and charts. It is saved in this browser and retained when you refresh or return later. Other browsers and devices have their own preferences. The initial default is **Light**.
+
+### 3.4 Demonstration use
 
 Demo credentials and a skip/explore control may appear only when demo functionality is explicitly enabled. Use demonstration environments for training, not real procurement submissions. Do not assume the skip control is a production guest-access feature or a security boundary. In a demo-enabled deployment, server-side fallback access can have broad permissions even when the screen appears to be in exploration mode.
 

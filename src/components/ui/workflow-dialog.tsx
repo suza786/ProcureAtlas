@@ -17,7 +17,7 @@ export function WorkflowDialog({ title, description, onClose, busy = false, wide
   return (
     <Dialog open onOpenChange={open => { if (!open && !busy) onClose() }}>
       <DialogContent
-        className={`bg-white max-h-[85vh] overflow-y-auto ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
+        className={`bg-card max-h-[85vh] overflow-y-auto ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
         showCloseButton={!busy}
         aria-busy={busy}
         onOpenAutoFocus={() => { launchControl.current = document.activeElement instanceof HTMLElement ? document.activeElement : null }}
@@ -26,8 +26,8 @@ export function WorkflowDialog({ title, description, onClose, busy = false, wide
         onPointerDownOutside={event => { if (busy) event.preventDefault() }}
         onInteractOutside={event => { if (busy) event.preventDefault() }}
       >
-        <DialogTitle className="text-sm font-semibold text-slate-900 pr-6">{title}</DialogTitle>
-        <DialogDescription className="text-xs text-slate-500">{description}</DialogDescription>
+        <DialogTitle className="text-sm font-semibold text-foreground pr-6">{title}</DialogTitle>
+        <DialogDescription className="text-xs text-muted-foreground">{description}</DialogDescription>
         {children}
       </DialogContent>
     </Dialog>

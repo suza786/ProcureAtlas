@@ -80,16 +80,16 @@ export function Approvals() {
     <div className="space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-            <Shield className="h-6 w-6 text-slate-700" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <Shield className="h-6 w-6 text-foreground" />
             {t("Approvals")}</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-muted-foreground mt-1">
             No consequential action is taken without explicit human authorization. SLA-tracked with escalation.
           </p>
         </div>
         <button
           onClick={() => setShowChains(true)}
-          className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+          className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted"
         >
           <Settings className="h-3.5 w-3.5" /> {t("Approval Chains")}</button>
       </div>
@@ -101,7 +101,7 @@ export function Approvals() {
             onClick={() => setFilter(f)}
             className={cn(
               'px-2.5 py-1 text-xs font-medium rounded-full border',
-              filter === f ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200'
+              filter === f ? 'bg-primary text-primary-foreground border-primary' : 'bg-card text-muted-foreground border-border'
             )}
           >
             {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -109,27 +109,27 @@ export function Approvals() {
         ))}
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-sm text-slate-500">{t("Loading approvals...")}</div>
+          <div className="p-8 text-center text-sm text-muted-foreground">{t("Loading approvals...")}</div>
         ) : items.length === 0 ? (
-          <div className="p-8 text-center text-sm text-slate-500">No {filter} approvals.</div>
+          <div className="p-8 text-center text-sm text-muted-foreground">No {filter} approvals.</div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-border">
             {items.map(a => (
               <div key={a.id} className="px-4 py-3">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      <span className="text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         {TRIGGER_LABELS[a.triggerType] ?? a.triggerType}
                       </span>
                       <span className={cn(
                         'text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded',
-                        a.decision === 'pending' ? 'bg-amber-500/15 text-amber-700' :
-                        a.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-700' :
-                        a.decision === 'rejected' ? 'bg-rose-500/15 text-rose-700' :
-                        'bg-sky-500/15 text-sky-700'
+                        a.decision === 'pending' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-300' :
+                        a.decision === 'approved' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' :
+                        a.decision === 'rejected' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300' :
+                        'bg-sky-500/15 text-sky-700 dark:text-sky-300'
                       )}>
                         {a.decision.replace('_', ' ')}
                       </span>
@@ -138,17 +138,17 @@ export function Approvals() {
                           <AlertTriangle className="h-2.5 w-2.5" /> overdue
                         </span>
                       )}
-                      <span className="text-[10px] text-slate-400">{t("Step")}{' '}{a.stepOrder}</span>
+                      <span className="text-[10px] text-muted-foreground">{t("Step")}{' '}{a.stepOrder}</span>
                     </div>
-                    <p className="text-sm font-medium text-slate-900 mt-1 truncate">{a.pursuit.tender.title}</p>
-                    {a.reason && <p className="text-xs text-slate-500 mt-0.5">{a.reason}</p>}
-                    <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500">
+                    <p className="text-sm font-medium text-foreground mt-1 truncate">{a.pursuit.tender.title}</p>
+                    {a.reason && <p className="text-xs text-muted-foreground mt-0.5">{a.reason}</p>}
+                    <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground">
                       <span>{t("Requested by")}{' '}{a.requestedBy}</span>
                       {a.approverRole && <span>· Requires: {a.approverRole}</span>}
                       {a.approver && <span>· Decided by {a.approver.email}</span>}
                       <span>· {formatDateTime(a.createdAt)}</span>
                       {a.slaDueAt && a.decision === 'pending' && (
-                        <span className={cn(a.isOverdue ? 'text-rose-600 font-medium' : '')}>
+                        <span className={cn(a.isOverdue ? 'text-rose-600 font-medium dark:text-rose-300' : '')}>
                           · SLA: {formatDate(a.slaDueAt)}
                         </span>
                       )}
@@ -167,13 +167,13 @@ export function Approvals() {
                       <button
                         onClick={() => decide(a.id, 'rejected')}
                         disabled={actioning === a.id}
-                        className="flex items-center gap-1 rounded-md border border-rose-500/30 text-rose-700 px-2 py-1 text-[10px] font-medium hover:bg-rose-50 disabled:opacity-50"
+                        className="flex items-center gap-1 rounded-md border border-rose-500/30 text-rose-700 px-2 py-1 text-[10px] font-medium hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
                       >
                         <XCircle className="h-2.5 w-2.5" /> {t("Reject")}</button>
                       <button
                         onClick={() => decide(a.id, 'changes_requested')}
                         disabled={actioning === a.id}
-                        className="text-[10px] text-slate-500 hover:text-slate-900 px-1.5 py-1"
+                        className="text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-1"
                       >
                         {t("Changes")}</button>
                     </div>
@@ -206,26 +206,26 @@ function ApprovalChainsModal({ onClose }: { onClose: () => void }) {
   return (
     <WorkflowDialog title={t("Approval Chain Configuration")} description="Review the configured approval steps and response deadlines." onClose={onClose} wide>
         {loading ? (
-          <p className="text-sm text-slate-500">{t("Loading...")}</p>
+          <p className="text-sm text-muted-foreground">{t("Loading...")}</p>
         ) : chains.length === 0 ? (
-          <p className="text-sm text-slate-500">{t("No approval chains configured. Default chains are used for bid decision and submission.")}</p>
+          <p className="text-sm text-muted-foreground">{t("No approval chains configured. Default chains are used for bid decision and submission.")}</p>
         ) : (
           <div className="space-y-3">
             {chains.map(c => (
-              <div key={c.id} className="rounded-md border border-slate-200 p-3">
+              <div key={c.id} className="rounded-md border border-border p-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-slate-900">{c.name}</p>
-                    <p className="text-xs text-slate-500">{TRIGGER_LABELS[c.triggerType] ?? c.triggerType} · SLA: {c.slaHours}h · {c.stepCount} step(s)</p>
+                    <p className="text-sm font-medium text-foreground">{c.name}</p>
+                    <p className="text-xs text-muted-foreground">{TRIGGER_LABELS[c.triggerType] ?? c.triggerType} · SLA: {c.slaHours}h · {c.stepCount} step(s)</p>
                   </div>
-                  <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded', c.isActive ? 'bg-emerald-500/15 text-emerald-700' : 'bg-slate-500/15 text-slate-600')}>
+                  <span className={cn('text-[10px] uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded', c.isActive ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' : 'bg-slate-500/15 text-muted-foreground')}>
                     {c.isActive ? 'active' : 'inactive'}
                   </span>
                 </div>
                 {c.steps && c.steps.length > 0 && (
                   <div className="mt-2 flex items-center gap-1 flex-wrap">
                     {c.steps.map((s, i) => (
-                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                         {i + 1}. {s.role}{s.approverEmail ? ` (${s.approverEmail})` : ''}
                       </span>
                     ))}
@@ -235,7 +235,7 @@ function ApprovalChainsModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         )}
-        <button onClick={onClose} className="mt-4 text-xs text-slate-500 hover:text-slate-900">{t("Close")}</button>
+        <button onClick={onClose} className="mt-4 text-xs text-muted-foreground hover:text-foreground">{t("Close")}</button>
     </WorkflowDialog>
   )
 }
